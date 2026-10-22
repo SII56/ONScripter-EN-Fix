@@ -127,7 +127,7 @@ $(EL)/libpng$(LIBSUFFIX): $(PNGSRC)/Makefile | $(EL)
 	@echo Building internal libpng...
 	@$(MAKE) -C $(PNGSRC) $(REDSO)
 	@$(MAKE) -C $(PNGSRC) install $(REDSO)
-	@sed -i '/^Requires.*:/s/ zlib//' $(EL)/pkgconfig/libpng*.pc
+	@perl -pi -e 's/ zlib// if /^Requires.*:/' $(EL)/pkgconfig/libpng*.pc
 
 $(EL)/libz$(LIBSUFFIX): | $(EL)
 	@echo Building internal zlib...
@@ -137,7 +137,7 @@ $(EL)/libz$(LIBSUFFIX): | $(EL)
 
 $(JPEGSRC)/Makefile:
 	@echo Configuring internal libjpeg...
-	@sed -i -e '/^bin_PROGRAMS/s/bin_/EXTRA_/' -e '/^man_MANS/s/=.*$$/=/' $(JPEGSRC)/Makefile.am
+	@perl -pi -e 's/^bin_PROGRAMS/EXTRA_PROGRAMS/' -e 's/^man_MANS=.*/man_MANS=/' $(JPEGSRC)/Makefile.am
 	@cd $(JPEGSRC) && \
 	autoreconf -fi && \
 	./configure --prefix="$(LPREFIX)" --disable-shared --enable-static $(OTHERCONFIG) $(REDIR)

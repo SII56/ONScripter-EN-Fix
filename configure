@@ -1116,7 +1116,7 @@ $echo_n "Writing Makefile... ${nobr}"
 case "$SYS" in
 Posix)  EXE=     ; OBJ=.o ; LIB=.a ; W32= ;;
 MacOSX) EXE=     ; OBJ=.o ; LIB=.a ; W32=
-        CFLAGSEXTRA="-fpascal-strings $CFLAGSEXTRA";;
+        ;;
 MinGW)  EXE=.exe ; OBJ=.o ; LIB=.a ; W32=true ;;
 *) echo "error: unsupported system";
    exit 1 ;;
@@ -1215,14 +1215,15 @@ TOOL_LIBS = -Lextlib/lib \\
             $LINKjpeg $LINKpng \\
             $LINKbz2 -lm
 LIBS = -Lextlib/lib \\
-       \$(shell \$(SDL_CONFIG) --static-libs)         \\
+       \$(shell \$(SDL_CONFIG) --libs)                \\
        \$(shell $SMPEG_CONFIG --libs)              \\
        $LINKSDL_ttf \$(shell $FREETYPE_CONFIG --libs) \\
-       $LINKSDL_image $LINKjpeg $LINKpng              \\
+       $LINKSDL_image $LINKjpeg $LINKpng $LINKz         \\
        $LINKSDL_mixer $LINKogg $LINKvorbis $LINKvorbisfile \\
-       $LINKbz2 -lm -framework QuickTime -framework CoreFoundation
+       $LINKbz2 -lm -framework CoreFoundation \
+       -framework AudioToolbox -framework AudioUnit -framework CoreAudio
 
-DEFS = -DMACOSX -DUTF8_CAPTION -DUTF8_FILESYSTEM -DUSE_OGG_VORBIS
+DEFS = -DUTF8_CAPTION -DUTF8_FILESYSTEM -DUSE_OGG_VORBIS
 NO_DEFAULT_ICON = true
 EXT_OBJS = $GFX_EXT_OBJS
 
@@ -1293,11 +1294,11 @@ OTHER_OBJS =
 RC_HDRS =
 _EOF
 
-if [ x$POSIX != x ]; then
+if [ x$POSIX != x ] && [ "$SYS" != "MacOSX" ]; then
     OTHER_OBJS="X11_messagebox\$(OBJSUFFIX)"
 fi
 
-if [ "$SYS" != "MinGW" ] && [ "$SYS" != "MacOSX" ]; then
+if [ "$SYS" != "MinGW" ]; then
 cat >> Makefile <<_EOF
 
 ICONFILE ?= ons-en.png
