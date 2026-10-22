@@ -36,6 +36,9 @@
 
 #include "ONScripterLabel.h"
 #include "ScriptParser.h"
+#ifdef __APPLE__
+#include "MacOSSupport.h"
+#endif
 #ifdef LINUX
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -937,6 +940,44 @@ void ONScripterLabel::variableEditMode( SDL_KeyboardEvent *event )
     SDL_WM_SetCaption( wm_edit_string, wm_icon_string );
 }
 
+void ONScripterLabel::warpMouse(int x, int y)
+{
+    SDL_WarpMouse(x, y);
+#if defined(__APPLE__) && !defined(MACOSX)
+    // Some SDL compatibility stacks multiply logical warp coordinates by the
+    // Retina backing scale. Only compensate when readback proves that behavior;
+    // correctly behaving SDL versions and non-Retina displays are unchanged.
+    int mx, my;
+    SDL_GetMouseState(&mx, &my);
+    double scale = MacOSSupport::backingScale();
+    if (scale > 1.0 && (mx < x - 1 || mx > x + 1 || my < y - 1 || my > y + 1)) {
+        bool scaled = mx >= x * scale - 1 && mx <= x * scale + 1 &&
+                      my >= y * scale - 1 && my <= y * scale + 1;
+        if (!scaled) {
+            // An oversized warp may already have been clipped at the window
+            // edge. Probe well inside the viewport, where scaling cannot clip,
+            // instead of inferring the mapping from that saturated coordinate.
+            int px = (int)(screen_width / (scale * 4));
+            int py = (int)(screen_height / (scale * 4));
+            if (px > 0 && py > 0) {
+                SDL_WarpMouse(px, py);
+                SDL_GetMouseState(&mx, &my);
+                scaled = mx >= px * scale - 1 && mx <= px * scale + 1 &&
+                         my >= py * scale - 1 && my <= py * scale + 1;
+            }
+        }
+        // Always restore the requested destination after a calibration probe.
+        SDL_WarpMouse(scaled ? (int)(x / scale + 0.5) : x,
+                      scaled ? (int)(y / scale + 0.5) : y);
+    }
+    if (getenv("ONS_TRACE_BUTTON_NAV")) {
+        SDL_GetMouseState(&mx, &my);
+        fprintf(stderr, "WARP target=(%d,%d) actual=(%d,%d) scale=%.2f viewport=%dx%d\n",
+                x, y, mx, my, scale, screen_width, screen_height);
+    }
+#endif
+}
+
 void ONScripterLabel::shiftCursorOnButton( int diff )
 //moves the mouse cursor to the new button "moused-over" via keystroke
 {
@@ -947,6 +988,7 @@ void ONScripterLabel::shiftCursorOnButton( int diff )
         ++num;
     }
 
+    if (num == 0) return;
     shortcut_mouse_line += diff;
     if      (shortcut_mouse_line < 0)    shortcut_mouse_line = num - 1;
     else if (shortcut_mouse_line >= num) shortcut_mouse_line = 0;
@@ -960,13 +1002,13 @@ void ONScripterLabel::shiftCursorOnButton( int diff )
         int x = button->select_rect.x;
         int y = button->select_rect.y;
         if (x < 0) clip.x -= x;
-        else if (x > screen_width){
+        else if (x >= screen_width){
             clip.w = 0;
             x = screen_width - 1;
         }
         else if (x+clip.w > screen_width) clip.w = screen_width - x;
         if (y < 0) clip.y -= y;
-        else if (x > screen_width){
+        else if (y >= screen_height){
             clip.h = 0;
             y = screen_height - 1;
         }
@@ -978,14 +1020,28 @@ void ONScripterLabel::shiftCursorOnButton( int diff )
                 anim = &sprite_info[ button->sprite_no ];
             else
                 anim = button->anim[0];
+            if (!anim || !anim->image_surface) return;
             SDL_Rect pos = anim->findOpaquePoint(&clip);
             x += pos.x;
             y += pos.y;
         } else {
-            x += clip.x;
-            y += clip.y;
+            x += (clip.x + clip.w) / 2;
+            y += (clip.y + clip.h) / 2;
         }
-        SDL_WarpMouse(x, y);
+        warpMouse(x, y);
+        int mx, my;
+        SDL_GetMouseState(&mx, &my);
+        current_button_state.x = mx;
+        current_button_state.y = my;
+        mouseOverCheck(mx, my);
+        if (getenv("ONS_TRACE_BUTTON_NAV")) {
+            int mx, my;
+            SDL_GetMouseState(&mx, &my);
+            fprintf(stderr, "NAV diff=%d index=%d button=%d target=(%d,%d) actual=(%d,%d) rect=(%d,%d,%d,%d) screen=%dx%d\n",
+                diff, shortcut_mouse_line, button->no, x, y, mx, my,
+                button->select_rect.x, button->select_rect.y, button->select_rect.w, button->select_rect.h,
+                screen_width, screen_height);
+        }
     }
 }
 

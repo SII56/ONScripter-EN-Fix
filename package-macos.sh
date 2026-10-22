@@ -20,6 +20,9 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Frameworks" "$CONTENTS/Resources/Licenses"
 cp onscripter-en "$CONTENTS/MacOS/onscripter-en"
 cp macosx/ons-en.icns "$CONTENTS/Resources/ons-en.icns"
 cp COPYING MACOS.md MACOS.zh-CN.md "$CONTENTS/Resources/"
+mkdir -p "$CONTENTS/Resources/Fonts" "$CONTENTS/Resources/Licenses/NotoSansMonoCJK"
+cp fonts/NotoSansMonoCJKsc-Regular.otf "$CONTENTS/Resources/Fonts/"
+cp fonts/OFL.txt fonts/README.md "$CONTENTS/Resources/Licenses/NotoSansMonoCJK/"
 
 # sdl12-compat loads SDL2 with dlopen; ordinary dependency scanners miss it.
 cp "$(brew --prefix sdl2)/lib/libSDL2-2.0.0.dylib" "$CONTENTS/Frameworks/"

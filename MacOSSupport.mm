@@ -26,6 +26,15 @@ void activate()
 }
 
 namespace MacOSSupport {
+double backingScale()
+{
+    @autoreleasepool {
+        NSWindow *window = [NSApp keyWindow];
+        if (!window) window = [NSApp mainWindow];
+        return window ? [window backingScaleFactor] : 1.0;
+    }
+}
+
 bool choice(const char *title, const char *message, const char *accept,
             const char *cancel, int encoding)
 {
@@ -131,6 +140,15 @@ std::string systemFont(bool chinese)
         }
         CFRelease(font);
         return path;
+    }
+}
+
+std::string bundledFont()
+{
+    @autoreleasepool {
+        NSString *path = [[NSBundle mainBundle] pathForResource:@"NotoSansMonoCJKsc-Regular"
+            ofType:@"otf" inDirectory:@"Fonts"];
+        return path ? std::string([path fileSystemRepresentation]) : std::string();
     }
 }
 

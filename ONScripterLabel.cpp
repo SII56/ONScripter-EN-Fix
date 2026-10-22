@@ -1324,12 +1324,15 @@ int ONScripterLabel::init()
     }
 #if defined(__APPLE__) && !defined(MACOSX)
     if (font_picker == -1 && !default_font) {
-        std::string fallback = MacOSSupport::systemFont(script_h.enc.getEncoding() == Encoding::CODE_GBK);
+        std::string fallback = MacOSSupport::bundledFont();
+        bool bundled = !fallback.empty();
+        if (!bundled)
+            fallback = MacOSSupport::systemFont(script_h.enc.getEncoding() == Encoding::CODE_GBK);
         if (!fallback.empty()) {
             font_file = new char[fallback.size() + 1];
             strcpy(font_file, fallback.c_str());
             font_picker = FONT_MACOS_HIRAGINO;
-            fprintf(stderr, "Using the macOS system font: %s\n", font_file);
+            fprintf(stderr, "Using the %s font: %s\n", bundled ? "bundled fallback" : "macOS system", font_file);
         }
     }
 #endif

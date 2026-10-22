@@ -30,10 +30,13 @@ unnotarized application obtained from another machine.
 
 ## Fonts and saved games
 
-Game-provided `default.ttf`, `.ttc`, `.otf`, or `.otc` files take priority. If none
-is present, the engine uses the installed Hiragino Sans font through CoreText (STHeiti for GBK scripts).
-No system fonts are copied into the package. Use a game-appropriate monospaced CJK
-font when its script depends on fixed character widths.
+Game-provided `default.ttf`, `.ttc`, `.otf`, or `.otc` files take priority.
+An explicit `--font` overrides automatic selection. When a game supplies no font,
+the app uses its bundled Noto Sans Mono CJK SC Regular, licensed under SIL OFL 1.1.
+It includes Chinese and Japanese glyphs with half-width Latin characters; the SC
+variant uses Simplified Chinese regional forms. The license is included in the app.
+System font fallback remains available for bare developer builds without this asset.
+No Apple system fonts are redistributed.
 
 The default save location is:
 

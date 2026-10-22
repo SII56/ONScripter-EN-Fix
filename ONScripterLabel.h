@@ -1107,6 +1107,7 @@ private:
     SDL_Surface *createSurfaceFromFile(char *filename, int *location);
 
     void shiftCursorOnButton( int diff );
+    void warpMouse(int x, int y);
     void effectBlend( SDL_Surface *mask_surface, int trans_mode,
                       Uint32 mask_value = 255, SDL_Rect *clip=NULL,
                       SDL_Surface *src1=NULL, SDL_Surface *src2=NULL,

@@ -12,6 +12,8 @@ std::string saveDirectory(const char *gameid);
 std::string chooseGameDirectory();
 std::string adjacentGameDirectory();
 std::string systemFont(bool chinese = false);
+std::string bundledFont();
+double backingScale();
 bool isAppBundle();
 void openURL(const char *url, int encoding);
 }
