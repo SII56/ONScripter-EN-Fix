@@ -76,16 +76,20 @@ Secondly, the saved-game location behaviour described above means that you do no
 
 In the latter case, the recommended approach is to store game data somewhere appropriate (e.g. ```/usr/local/share/<title>```) and to create a shell script in an appropriate place (e.g. ```/usr/local/bin/<title>```) that launches the onscripter executable with a suitable argument to ```-r```.  Since there is no convenient way to distribute binaries that will work even on multiple Linux distributions, let alone other Unix platforms, it is recommended that packages instead depend on the user supplying a separate ONScripter-EN binary, either built from source or from an OS/distro-specific package.
 
-We currently do not support macOS builds, although that support is in the works.  macOS, although it still has a FreeBSD-derived UNIX-alike userland, is not truly a Unix.  It also uses the concept of *App Bundles*, which are specially-formatted directory structures that look to the end user like a single item.  Furthermore, as of more recent macOS versions, it is now impossible to run code that has not been properly code-signed and notarized by an approved Apple Developer.  This makes redistribution of many open-source projects a much more cumbersome procedure (for instance, it costs $99/year to maintain an Apple Developer license).  Our sister project, [onscripter-insani](https://github.com/insani-org/onscripter-insani) provides official Intel and Apple Silicon macOS builds, and we will be porting over that build system to ONScripter-EN as time goes on.
+This fork targets **macOS only**.  macOS is not truly a Unix (it still has a FreeBSD-derived userland) and it uses *App Bundles*, so the build system needs platform-specific handling; that work lives in this branch.  Both Apple Silicon and Intel are supported, through Homebrew's `sdl12-compat` shim.
+
+```bash
+brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg \
+             dylibbundler autoconf automake libtool
+./build-macos.sh
+```
+
+See [MACOS.md](MACOS.md) for what was changed, what is known to be broken, and how to run a game (a `default.ttf` in the game directory is required).
 
 ## Build Requirements
-ONScripter is based on SDL, and should run on any platform for which SDL is available.  The original version has been successfully compiled on platforms as diverse as iOS, Android, the Nintendo Switch, the PSP/PS Vita, Symbian, *etc*.
+ONScripter is based on SDL.  This branch builds against the SDL 1.2 API through `sdl12-compat`, and builds the SDL 1.2-era add-on libraries (SDL_image, SDL_mixer, SDL_ttf) from the vendored sources in `extlib/src`.  libpng, libjpeg, zlib, libogg and libvorbis are vendored too and linked statically.
 
-ONScripter-EN has slightly more strict requirements, however.  Since ONScripter's original build system is extremely difficult to use (requiring the creation of a custom makefile for every minor platform variation), it has been replaced in this branch with a more conventional configure-build system; this depends on a POSIX-like environment with GNU make.  The code has been tested primarily with the GNU C++ compiler; Intel C++ 10 has also been tried successfully.
-
-The primary test environment is GNU/Linux (x86-64).  Assuming standard build tools are installed, the full-source distribution is likely to compile out-of-the-box or with only minimal changes on truly POSIX-conformant platforms (\*e.g.\* GNU/Linux, \*BSD).  The primary target environment, on the other hand, is 32-bit Windows (i686).  [MSYS2](https://msys2.org) on Windows 10+ is assumed for these builds, and due to multiple incompatibilities between MSYS2 and the original configure script, specially-modified Makefile for both x86-64 and i686 Windows compilation are provided.  Development of those Makefiles can be found [here](https://github.com/insani-org/onscripter-en-msys2-configure-makefile).
-
-Please see ```INSTALL``` in the source distribution for other specific build instructions.
+Only macOS is maintained.  The Linux and Windows build files that used to live here were removed, along with the X11 message-box helper and the Win32 resource files.  The remaining `#ifdef WIN32` / `#ifdef LINUX` blocks inside the engine are deliberately left alone, so the sources stay close to upstream.
 
 ## Localization
 While ONScripter proper, and previous versions of ONScripter-EN, require English or Japanese settings to be selected at compile-time, this version can be run in both English and Japanese modes.

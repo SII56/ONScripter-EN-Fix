@@ -1295,9 +1295,6 @@ OTHER_OBJS =
 RC_HDRS =
 _EOF
 
-if [ x$POSIX != x ] && [ "$SYS" != "MacOSX" ]; then
-    OTHER_OBJS="X11_messagebox\$(OBJSUFFIX)"
-fi
 
 if [ "$SYS" != "MinGW" ]; then
 cat >> Makefile <<_EOF

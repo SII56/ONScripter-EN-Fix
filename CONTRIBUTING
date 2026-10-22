@@ -49,7 +49,6 @@ ON-LINE
   API documentation:            https://github.com/insani-org/nscripter-api-doc
   Lua API documentation:        https://github.com/Galladite27/nscripter-lua-api-doc
   Devkit:                       https://github.com/Galladite27/ONScripter-EN-devkit
-  Static makefiles (MSYS2):     https://github.com/insani-org/onscripter-en-msys2-configure-makefile
 
 GENERAL GUIDELINES
   Due to a (greatly appreciated) increase in the number of contributors to the ONScripter-EN project

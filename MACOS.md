@@ -55,7 +55,7 @@ brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg dylibbundler \
 - 补上 `-framework AudioToolbox -framework AudioUnit -framework CoreAudio`，  
   SDL_mixer 的 `native_midi_macosx.c` 需要它们（`NewMusicSequence` 等符号）。
 - `$LINKz` 补进链接行，否则 libpng 的 `inflate` / `deflate` 找不到。
-- 不再把 `X11_messagebox.cpp` 加入目标。该文件无条件 `#include <X11/Xlib.h>`，  
+- 删掉 `X11_messagebox.cpp` 及其在 configure 里的挂钩。该文件无条件 `#include <X11/Xlib.h>`，  
   而 macOS 没有 X11 头（除非装 XQuartz）。
 - 让 macOS 也生成 `resources.h`（图标嵌入），否则 `ONScripterLabel.cpp` 的  
   `#include "resources.h"` 会失败。
