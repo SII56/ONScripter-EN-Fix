@@ -36,9 +36,10 @@ SDLTSRC = $(ES)/SDL_ttf-2.0.11
 
 LPREFIX = $(shell pwd)/extlib
 
-# macOS: SDL_image 的 ImageIO 后端源码不在仓库里，必须关掉；
-# 另外 extlib 里的 libpng/libjpeg 不在默认搜索路径上，要显式指定。
-# SDL_ttf 自带的 showfont 示例链接时缺 iconv 符号。
+# macOS: SDL_image's ImageIO backend source is not in this repository, so it
+# has to be disabled; the vendored libpng/libjpeg are not on the default search
+# path either, so point the compiler at them explicitly.
+# SDL_ttf's bundled showfont demo fails to link without iconv.
 ifeq ($(SYS),MacOSX)
 SDL_IMAGE_EXTRA = CPPFLAGS="-I$(LPREFIX)/include" LDFLAGS="-L$(LPREFIX)/lib" LIBS="-liconv"
 SDL_TTF_EXTRA   = LIBS="-liconv"

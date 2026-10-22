@@ -77,3 +77,6 @@ extlib/src/libpng-1.6.39/pngtest
 extlib/src/libpng-1.6.39/pngunknown
 extlib/src/libpng-1.6.39/pngvalid
 extlib/src/libpng-1.6.39/scripts/sym.out
+
+# local feature-test scratch area, never committed
+/demo/

@@ -1,17 +1,20 @@
-# macOS 构建说明（个人分支）
+# Building on macOS (personal fork)
 
-本仓库是 [Galladite27/ONScripter-EN](https://github.com/Galladite27/ONScripter-EN) 的个人分支，  
-目标只有一个：**让 ONScripter-EN 在 macOS（Apple Silicon / Intel）上能编译、能跑**。
+[中文说明](MACOS.zh-CN.md)
 
-上游明确表示暂不支持 macOS 构建（README「Build Requirements」一节），  
-其 `configure` 里的 Darwin 分支是 2000 年代 Xcode 时代的遗留物，已经不可用。  
-本分支把这个分支修好，并让它走 insani 分支验证过的「sdl12-compat + 系统库」路线。
+This is a personal fork of [Galladite27/ONScripter-EN](https://github.com/Galladite27/ONScripter-EN)
+with exactly one goal: **make ONScripter-EN compile and run on macOS** (Apple Silicon and Intel).
 
-许可证保持 **GPL v2** 不变（见 `COPYING`）。
+Upstream does not support macOS builds (see its README, "Build Requirements"), and the
+Darwin branch in its `configure` is a leftover from the 2000s Xcode port that no longer
+works. This branch repairs that path and follows the route already proven by the sister
+project `onscripter-insani`: `sdl12-compat` plus system libraries.
+
+The license stays **GPL v2** (see `COPYING`).
 
 ---
 
-## 快速开始
+## Quick start
 
 ```bash
 brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg dylibbundler \
@@ -19,102 +22,109 @@ brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg dylibbundler \
 ./build-macos.sh
 ```
 
-产物是同目录下的 `onscripter-en`（Mach-O arm64/x86_64）。
+The result is `onscripter-en` in the same directory (Mach-O arm64 or x86_64).
 
-## 环境要求
+## Requirements
 
-- macOS 11+（本分支在 macOS 27 / arm64 上验证）
-- Xcode Command Line Tools（`xcode-select --install`）
-- Homebrew（Apple Silicon 默认 `/opt/homebrew`）
+- macOS 11 or later (this branch was verified on macOS 27 / arm64)
+- Xcode Command Line Tools (`xcode-select --install`)
+- Homebrew (on Apple Silicon this lives in `/opt/homebrew`)
 
-## 依赖说明
+## Dependencies
 
-| 依赖                                           | 来源                      | 说明                                   |
-| -------------------------------------------- | ----------------------- | ------------------------------------ |
-| SDL 1.2                                      | Homebrew `sdl12-compat` | SDL2 之上的 1.2 ABI 兼容层，提供 `sdl-config` |
-| SDL_image / SDL_mixer / SDL_ttf              | 仓库内置 `extlib/src`       | 用系统 `sdl-config` 编译，静态链接             |
-| smpeg / freetype / bzip2                     | Homebrew                | 系统库                                  |
-| libpng / libjpeg / zlib / libogg / libvorbis | 仓库内置                    | 静态链接                                 |
+| Dependency | Source | Notes |
+|---|---|---|
+| SDL 1.2 | Homebrew `sdl12-compat` | 1.2 ABI shim on top of SDL2; provides `sdl-config` |
+| SDL_image / SDL_mixer / SDL_ttf | vendored in `extlib/src` | built against the system `sdl-config`, linked statically |
+| smpeg / freetype / bzip2 | Homebrew | system libraries |
+| libpng / libjpeg / zlib / libogg / libvorbis | vendored | linked statically |
 
-**注意**：Homebrew 已不再提供 `sdl_image` / `sdl_mixer` / `sdl_ttf` 这三个 SDL1.2 名字的 formula  
-（现在只有 `sdl2_image` 等 SDL2 版本）。所以三个扩展库用仓库自带的 1.2 版本编译，  
-这比引入 `sdl2_*`（会连带升级 freetype / harfbuzz / glib 等十几个包）干净得多。
+Note: Homebrew no longer ships `sdl_image` / `sdl_mixer` / `sdl_ttf` (the SDL 1.2-era
+formula names); only the SDL2 variants such as `sdl2_image` remain. Building the vendored
+1.2 versions is also much cleaner than pulling in `sdl2_*`, which drags in upgrades of
+freetype, harfbuzz, glib and a dozen other packages.
 
 ---
 
-## 相对上游的改动
+## Changes relative to upstream
 
-只动了 5 个文件，全部是构建系统层面，**没有改任何引擎逻辑**：
+Everything below is build-system level. **No engine logic was touched.**
 
-### 1. `configure` — 给 Darwin 一个能用的分支
+### 1. `configure` - give Darwin a working branch
 
-- 删除 `DEFS` 里的 `-DMACOSX`。这个宏会打开源码里 97 处 2006 年的 Cocoa 胶水代码  
-  （`#import <Foundation/...>`、`cocoa_alertbox.h`），而 `macosx/*.mm` 从来没被任何 Makefile 编译过，  
-  那套东西是死的。不定义它，代码走通用 POSIX 路径，和 insani 分支的做法一致。
-- 删除 `-framework QuickTime`。该 framework 在 macOS 10.15 Catalina 已被移除。
-- 补上 `-framework AudioToolbox -framework AudioUnit -framework CoreAudio`，  
-  SDL_mixer 的 `native_midi_macosx.c` 需要它们（`NewMusicSequence` 等符号）。
-- `$LINKz` 补进链接行，否则 libpng 的 `inflate` / `deflate` 找不到。
-- 删掉 `X11_messagebox.cpp` 及其在 configure 里的挂钩。该文件无条件 `#include <X11/Xlib.h>`，  
-  而 macOS 没有 X11 头（除非装 XQuartz）。
-- 让 macOS 也生成 `resources.h`（图标嵌入），否则 `ONScripterLabel.cpp` 的  
-  `#include "resources.h"` 会失败。
-- 去掉 `-fpascal-strings`。
+- Drop `-DMACOSX` from `DEFS`. That macro enables ~97 blocks of 2006-era Cocoa glue
+  (`#import <Foundation/...>`, `cocoa_alertbox.h`), and the `.mm` files under `macosx/`
+  have never been compiled by any makefile, so the whole thing is dead. Without the
+  macro the code takes the generic POSIX path, the same way `onscripter-insani` does.
+- Drop `-framework QuickTime`; that framework was removed in macOS 10.15 Catalina.
+- Add `-framework AudioToolbox -framework AudioUnit -framework CoreAudio`, needed by
+  SDL_mixer's `native_midi_macosx.c` (`NewMusicSequence` and friends).
+- Add `$LINKz` to the link line, otherwise libpng's `inflate` / `deflate` are unresolved.
+- Delete `X11_messagebox.cpp` and its hook in `configure`. That file includes
+  `<X11/Xlib.h>` unconditionally, and macOS has no X11 headers unless XQuartz is installed.
+- Generate `resources.h` on macOS too, otherwise `ONScripterLabel.cpp` fails on
+  `#include "resources.h"`.
+- Drop `-fpascal-strings`.
 
-### 2. `Makefile.extlibs` — BSD sed 兼容
+### 2. `Makefile.extlibs` - BSD sed compatibility
 
-两处 `sed -i` 改成 `perl -pi -e`。macOS 的 BSD sed 对 `-i` 的后缀参数处理与 GNU sed 不同，  
-`sed -i -e ...` 会报 `invalid command code`。
+Two `sed -i` calls became `perl -pi -e`. BSD sed on macOS handles the `-i` suffix argument
+differently from GNU sed, so `sed -i -e ...` fails with `invalid command code`.
 
 ### 3. `extlib/src/zlib-1.2.13/zutil.h`
 
-`TARGET_OS_MAC` 在现代 macOS SDK 里恒为真，导致 zlib 把 `fdopen` 定义成 `NULL` 宏，  
-和 SDK 的 `_stdio.h` 声明冲突。改为仅在 classic Mac 下生效。
+`TARGET_OS_MAC` is always true on modern macOS SDKs, which makes zlib define `fdopen` as a
+macro and collide with the declaration in the SDK's `_stdio.h`. Restrict it to classic Mac.
 
 ### 4. `extlib/src/libpng-1.6.39/pngpriv.h`
 
-同一类问题：`TARGET_OS_MAC` 为真时它会 `#include <fp.h>`，而 `fp.h` 在 macOS 26+ SDK 已删除。
+Same root cause: with `TARGET_OS_MAC` true it includes `<fp.h>`, which was removed from
+recent SDKs.
 
 ### 5. `extlib/src/libvorbis-1.3.7/configure.ac`
 
-删掉 `-force_cpusubtype_ALL`。这是 PowerPC 时代给 Xcode 用的链接参数，现代 `ld` 直接报  
-`unknown options`。
+Drop `-force_cpusubtype_ALL`. It is a PowerPC-era linker flag for Xcode and modern `ld`
+rejects it with `unknown options`.
 
 ---
 
-## 运行游戏
+## Running a game
 
-和上游一样，游戏目录里**必须**有一个字体文件（`default.ttf` / `.ttc` / `.otf` / `.otc`）。
+As with upstream, the game directory **must** contain a font file
+(`default.ttf` / `.ttc` / `.otf` / `.otc`).
 
-注意：ONScripter-EN **没有** macOS 系统字体回退（insani 分支才有，它会用 Hiragino Maru Gothic）。
-没放字体时会直接 `no font file detected; exiting`。临时测试可以：
+Note that ONScripter-EN has **no** macOS system font fallback (only `onscripter-insani`
+does, using Hiragino Maru Gothic). Without a font it exits with
+`no font file detected; exiting`. For a quick test:
 
 ```bash
-cp "/System/Library/Fonts/Supplemental/AppleGothic.ttf" 游戏目录/default.ttf
+cp "/System/Library/Fonts/Supplemental/AppleGothic.ttf" <game dir>/default.ttf
 ```
 
-正式玩日文游戏建议用等宽 CJK 字体（Genjyuu Gothic X Monospace / Migu 2M / Sazanami Gothic）。
+For Japanese games, prefer a monospaced CJK font (Genjyuu Gothic X Monospace, Migu 2M,
+Sazanami Gothic).
 
-## 已验证到什么程度
+## What has been verified
 
-- `--help` / `--version` 正常
-- 最小脚本（`*define` / `game` / 一行文本）能解析、执行、正常退出
-- SDL 视频初始化（sdl12-compat）、字体加载、脚本解析链路都走通了
-- **没有跑过完整游戏**，音频 / 视频 / 存档 / 菜单都还没实测
+- `--help` and `--version` work
+- a minimal script (`*define` / `game` / one line of text) parses, runs and exits cleanly
+- SDL video init (via `sdl12-compat`), font loading and script parsing all work
+- **no full game has been played yet**; audio, video, save/load and the system menu are untested
 
-## 已知限制
+## Known limitations
 
-- **没有做 app bundle**。目前产物是裸二进制，存档默认写在游戏目录。  
-  要做 `.app` 可以照抄 insani 分支的 `makedist.MacOSX.sh` + `-DAPPBUNDLE`。
-- **没有代码签名 / 公证**。自己本机用 `codesign -s - onscripter-en` 即可；  
-  对外分发需要 Apple 开发者账号（$99/年）+ notarytool。
-- **MIDI**：走 SDL_mixer 的 native_midi_macosx（AudioToolbox），没有实测过 MIDI 游戏。
-- **未跑过实际游戏**。目前只验证了二进制能启动、`--help` / `--version` 正常、最小脚本能跑通；
-  音频 / 视频 / 存档 / 菜单都还没实测。
-- **arm64 没有 SSE/MMX 加速**。`configure` 的 `ARCH` 检测只认 x86/x86_64/ppc，  
-  Apple Silicon 落到 `unknown`，于是 `USE_CPU_GFX=false`，纯 C 路径。功能正常，只是慢一点。
+- **No app bundle.** The output is a bare binary and saves go into the game directory.
+  For a `.app`, copy `makedist.MacOSX.sh` and `-DAPPBUNDLE` from `onscripter-insani`.
+- **No code signing or notarization.** `codesign -s - onscripter-en` is enough for local
+  use; distributing to others needs an Apple Developer account ($99/year) plus `notarytool`.
+- **MIDI** goes through SDL_mixer's `native_midi_macosx` (AudioToolbox) and has not been
+  tested with a MIDI-heavy game.
+- **No SSE/MMX acceleration on arm64.** `configure`'s `ARCH` detection only knows
+  x86/x86_64/ppc, so Apple Silicon falls through to `unknown`, which sets
+  `USE_CPU_GFX=false` and takes the plain C path. Correct, just slower.
 
-## 与上游的关系
+## Relationship to upstream
 
-本分支**不打算向上游提 PR**，纯个人使用。上游的 macOS 支持由维护者自己规划，  
-届时大概率也会走同样的「搬 insani 构建系统」路线。
+This branch is personal and **will not be sent upstream as a PR**. macOS support is on the
+maintainers' own roadmap, and they will most likely take the same route of porting
+`onscripter-insani`'s build system.
