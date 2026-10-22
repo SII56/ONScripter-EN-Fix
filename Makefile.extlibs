@@ -137,7 +137,7 @@ $(EL)/libz$(LIBSUFFIX): | $(EL)
 
 $(JPEGSRC)/Makefile:
 	@echo Configuring internal libjpeg...
-	@perl -pi -e 's/^bin_PROGRAMS/EXTRA_PROGRAMS/' -e 's/^man_MANS=.*/man_MANS=/' $(JPEGSRC)/Makefile.am
+	@perl -pi -e 's/^bin_PROGRAMS/EXTRA_PROGRAMS/' -e 's/^man_MANS\s*=.*/man_MANS =/' $(JPEGSRC)/Makefile.am
 	@cd $(JPEGSRC) && \
 	autoreconf -fi && \
 	./configure --prefix="$(LPREFIX)" --disable-shared --enable-static $(OTHERCONFIG) $(REDIR)

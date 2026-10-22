@@ -3,156 +3,27 @@ name: build
 on: [push, pull_request]
 
 jobs:
-  linux:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            c_compiler: gcc
-            cpp_compiler: g++
-          - os: ubuntu-latest
-            c_compiler: clang
-            cpp_compiler: clang++
-    runs-on: ${{ matrix.os }}
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 30
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: install dependencies (Linux)
-      run: |
-        sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu `lsb_release -sc` main universe"
-        sudo apt-get update -y -qq
-        sudo apt-get install libasound2-dev libpulse-dev libwebp-dev libxrandr-dev tar autoconf libtool clang
-    - name: configure
-      env:
-        CC: ${{ matrix.c_compiler }}
-        CXX: ${{ matrix.cpp_compiler }}
-      run: |
-        ./configure --with-internal-libs
-    - name: reconfigure extlibs (ogg)
-      run: |
-        cd extlib/src/libogg-1.3.5
-        autoreconf -fi
-        autoupdate
     - name: build
+      run: ./build-macos.sh
+
+    - name: smoke test
       run: |
-        NCPUS=$(getconf _NPROCESSORS_ONLN)
-        make -j $NCPUS VERBOSE=true
-        make -j $NCPUS VERBOSE=true tools
-        make check
-        tar -czvf onscripter-en.Linux.${{ matrix.c_compiler }}.x86-64.tar.gz \
-          onscripter-en \
-          README.md \
-          COPYING \
-          CHANGES \
-          tools/ns2conv \
-          tools/nsaconv \
-          tools/sardec \
-          tools/batchconv \
-          tools/nbzdec \
-          tools/ns2make \
-          tools/nsamake \
-          tools/sarconv \
-          tools/ns2dec \
-          tools/nsadec \
-          tools/nscdec \
-          tools/nscmake \
-          tools/sarmake
+        ./onscripter-en --version
+        ./onscripter-en --help | head -3
 
     - uses: actions/upload-artifact@v4
       with:
-        name: ONScripter-EN Linux x86-64 ${{ matrix.c_compiler }} Build
-        path: ${{ github.workspace }}/onscripter-en.Linux.${{ matrix.c_compiler }}.x86-64.tar.gz
-
-  windows:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            cc: gcc
-            sys: mingw64
-            env: x86_64
-            arch: x86-64
-          - os: windows-latest
-            cc: gcc
-            sys: mingw32
-            env: i686
-            arch: i686
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - uses: msys2/setup-msys2@v2
-      with:
-        msystem: ${{matrix.sys}}
-        update: true
-        install:
-          mingw-w64-${{matrix.env}}-SDL
-          mingw-w64-${{matrix.env}}-SDL_ttf
-          mingw-w64-${{matrix.env}}-SDL_image
-          mingw-w64-${{matrix.env}}-bzip2
-          mingw-w64-${{matrix.env}}-libmikmod
-          mingw-w64-${{matrix.env}}-libmad
-          mingw-w64-${{matrix.env}}-libogg
-          mingw-w64-${{matrix.env}}-libvorbis
-          mingw-w64-${{matrix.env}}-freetype
-          mingw-w64-${{matrix.env}}-iconv
-          mingw-w64-${{matrix.env}}-zlib
-          mingw-w64-${{matrix.env}}-toolchain
-          mingw-w64-${{matrix.env}}-autotools
-          mingw-w64-${{matrix.env}}-flac
-          autotools
-          make
-          zip
-
-    - shell: msys2 {0}
-      name: Build SMpeg extlib
-      run: |
-        NCPUS=$(getconf _NPROCESSORS_ONLN)
-        (cd extlib/src/smpeg && ./configure --disable-{shared,gtk-player,opengl-player,debug})
-        make -j $NCPUS -C extlib/src/smpeg VERBOSE=true
-        make -C extlib/src/smpeg install VERBOSE=true
-
-    - shell: msys2 {0}
-      name: Build SDL_mixer 1.2.12 extlib
-      run: |
-        NCPUS=$(getconf _NPROCESSORS_ONLN)
-        (cd extlib/src/SDL_mixer-1.2.12 && ./configure --disable-{shared,music-cmd,music-timidity-midi} CFLAGS="${CFLAGS} -Wno-error=implicit-function-declaration")
-        make -j $NCPUS -C extlib/src/SDL_mixer-1.2.12 VERBOSE=true
-        make -C extlib/src/SDL_mixer-1.2.12 install VERBOSE=true
-
-    - shell: msys2 {0}
-      name: Build
-      run: |
-        NCPUS=$(getconf _NPROCESSORS_ONLN)
-        make -f ./msys2/Makefile.Windows.MSYS2.${{matrix.arch}}.insani -j $NCPUS VERBOSE=true
-        make -f ./msys2/Makefile.Windows.MSYS2.${{matrix.arch}}.insani -j $NCPUS VERBOSE=true tools
-        make -f ./msys2/Makefile.Windows.MSYS2.${{matrix.arch}}.insani check
-        zip onscripter-en.Windows.${{matrix.arch}}.zip \
-          onscripter-en.exe \
-          README.md \
-          COPYING \
-          CHANGES \
-          tools/ns2conv.exe \
-          tools/nsaconv.exe \
-          tools/sardec.exe \
-          tools/batchconv.exe \
-          tools/nbzdec.exe \
-          tools/ns2make.exe \
-          tools/nsamake.exe \
-          tools/sarconv.exe \
-          tools/ns2dec.exe \
-          tools/nsadec.exe \
-          tools/nscdec.exe \
-          tools/nscmake.exe \
-          tools/sarmake.exe
-
-    - uses: actions/upload-artifact@v4
-      with:
-        name: ONScripter-EN Windows ${{matrix.arch}} Build
-        path: ${{ github.workspace }}/onscripter-en.Windows.${{matrix.arch}}.zip
+        name: onscripter-en.macOS.arm64
+        path: onscripter-en

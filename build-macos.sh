@@ -24,11 +24,11 @@ fi
 
 # tarball 里带的 aclocal.m4 是按老 automake 生成的，和本机版本对不上会触发
 # "aclocal-1.16: command not found"，所以先重新生成。
+# 注意：新 clone 出来的树里 configure 和 configure.ac 时间戳相同，不能用 -nt 判断，
+# 否则会跳过这一步然后在 make 阶段炸掉，这里无条件重跑（几秒钟的事）。
 for d in libogg-1.3.5 libvorbis-1.3.7; do
-    if [ ! -f "$EXT/src/$d/configure" ] || [ "$EXT/src/$d/configure.ac" -nt "$EXT/src/$d/configure" ]; then
-        echo "==> autoreconf $d"
-        ( cd "$EXT/src/$d" && autoreconf -fi >/dev/null )
-    fi
+    echo "==> autoreconf $d"
+    ( cd "$EXT/src/$d" && autoreconf -fi >/dev/null )
 done
 
 # SDL_ttf: 自带的 showfont 示例链接时缺 iconv 符号，configure 时补上 -liconv。
