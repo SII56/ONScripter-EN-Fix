@@ -180,13 +180,13 @@ static inline bool isNonPrinting(const char *text, Encoding enc)
              ((text[0] == (char)0x81) && (text[1] == (char)0x40)) );
 }
 
-SDL_Surface *ONScripterLabel::renderGlyph(TTF_Font *font, Uint16 text)
+SDL_Surface *ONScripterLabel::renderGlyph(TTF_Font *font, Uint16 text, int max_width)
 {
     GlyphCache *gc = root_glyph_cache;
     GlyphCache *pre_gc = gc;
     while(1){
         if (gc->text == text &&
-            gc->font == font){
+            gc->font == font && gc->max_width == max_width){
             if (gc != pre_gc){
                 pre_gc->next = gc->next;
                 gc->next = root_glyph_cache;
@@ -205,6 +205,7 @@ SDL_Surface *ONScripterLabel::renderGlyph(TTF_Font *font, Uint16 text)
 
     gc->text = text;
     gc->font = font;
+    gc->max_width = max_width;
     if (gc->surface != NULL) SDL_FreeSurface(gc->surface);
 
     /* Initializing SDL_Color.unused here to silence warnings about unused
@@ -213,6 +214,39 @@ SDL_Surface *ONScripterLabel::renderGlyph(TTF_Font *font, Uint16 text)
      (contribution by Andrius, March 2010) */
     static SDL_Color fcol={0xff, 0xff, 0xff, 0xff}, bcol={0, 0, 0, 0};
     gc->surface = TTF_RenderGlyph_Shaded( font, text, fcol, bcol );
+
+    // The shaded glyph is an 8-bit coverage mask. Area-average each horizontal
+    // interval to preserve antialiasing when a proportional ASCII glyph is wider
+    // than the half-cell available in a legacy script. Cache the fitted result.
+    SDL_Surface *source = gc->surface;
+    if (source && max_width > 0 && source->w > max_width) {
+        SDL_Surface *fitted = SDL_CreateRGBSurface(SDL_SWSURFACE, max_width,
+            source->h, 8, 0, 0, 0, 0);
+        if (fitted) {
+            SDL_SetColors(fitted, source->format->palette->colors, 0,
+                          source->format->palette->ncolors);
+            SDL_LockSurface(source);
+            SDL_LockSurface(fitted);
+            for (int y = 0; y < source->h; ++y) {
+                const Uint8 *src = (const Uint8 *)source->pixels + y * source->pitch;
+                Uint8 *dst = (Uint8 *)fitted->pixels + y * fitted->pitch;
+                for (int x = 0; x < max_width; ++x) {
+                    int left = x * source->w, right = (x + 1) * source->w;
+                    unsigned long coverage = 0;
+                    for (int sx = left / max_width; sx * max_width < right; ++sx) {
+                        int start = left > sx * max_width ? left : sx * max_width;
+                        int end = right < (sx + 1) * max_width ? right : (sx + 1) * max_width;
+                        coverage += src[sx] * (end - start);
+                    }
+                    dst[x] = (Uint8)((coverage + source->w / 2) / source->w);
+                }
+            }
+            SDL_UnlockSurface(fitted);
+            SDL_UnlockSurface(source);
+            SDL_FreeSurface(source);
+            gc->surface = fitted;
+        }
+    }
 
     return gc->surface;
 }
@@ -237,7 +271,18 @@ void ONScripterLabel::drawGlyph( SDL_Surface *dst_surface, Fontinfo *info, SDL_C
                       &minx, &maxx, &miny, &maxy, &advanced );
     //printf("min %d %d %d %d %d %d\n", minx, maxx, miny, maxy, advanced,TTF_FontAscent((TTF_Font*)info->ttf_font)  );
 
-    SDL_Surface *tmp_surface = renderGlyph( (TTF_Font*)info->ttf_font, unicode );
+    int glyph_x = minx, max_width = 0;
+    if (fit_legacy_ascii && script_h.enc.getEncoding() != Encoding::CODE_UTF8 &&
+        info->getTateyokoMode() == Fontinfo::YOKO_MODE && unicode >= 0x21 && unicode <= 0x7e) {
+        int cell_width = ExpandPos(info->pitch_xy[0]) / 2;
+        if (cell_width > 0) {
+            if (glyph_x < 0 || glyph_x >= cell_width) glyph_x = 0;
+            max_width = cell_width - glyph_x;
+            if (info->is_shadow && shade_distance[0] > 0 && max_width > shade_distance[0])
+                max_width -= shade_distance[0];
+        }
+    }
+    SDL_Surface *tmp_surface = renderGlyph( (TTF_Font*)info->ttf_font, unicode, max_width );
 
     if (tmp_surface == NULL) return;
 
@@ -258,7 +303,7 @@ void ONScripterLabel::drawGlyph( SDL_Surface *dst_surface, Fontinfo *info, SDL_C
         dst_rect.y = xy[1] + minx;
     }
     else {
-        dst_rect.x = xy[0] + minx;
+        dst_rect.x = xy[0] + glyph_x;
         dst_rect.y = xy[1] + TTF_FontAscent((TTF_Font*)info->ttf_font) - maxy;
     }
 

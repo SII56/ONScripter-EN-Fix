@@ -161,6 +161,7 @@ public:
         if (mask_type != PNG_MASK_USE_ALPHA) png_rgb_opaque = false;
     }
     inline void setPngRGBOpaque() { png_rgb_opaque = true; }
+    inline void setFitLegacyASCII() { fit_legacy_ascii = true; }
     inline void setEnglishDefault()
         { script_h.default_script = ScriptHandler::LATIN_SCRIPT; }
     inline void setJapaneseDefault()
@@ -764,6 +765,7 @@ private:
     /* General image-related variables */
     int png_mask_type;
     bool png_rgb_opaque;
+    bool fit_legacy_ascii;
 
     /* ---------------------------------------- */
     /* Background related variables */
@@ -827,8 +829,9 @@ private:
         Uint16 text;
         TTF_Font *font;
         SDL_Surface *surface;
+        int max_width;
         GlyphCache()
-        : next(NULL), text(0), font(NULL), surface(NULL) {}
+        : next(NULL), text(0), font(NULL), surface(NULL), max_width(0) {}
         ~GlyphCache() { SDL_FreeSurface(surface); }
     } *root_glyph_cache, glyph_cache[NUM_GLYPH_CACHE];
     int last_textpos_xy[2];
@@ -838,7 +841,7 @@ private:
     // New option specifies if we should calculate early the total px
     // from the full-width px and number of columns
 
-    SDL_Surface *renderGlyph(TTF_Font *font, Uint16 text);
+    SDL_Surface *renderGlyph(TTF_Font *font, Uint16 text, int max_width=0);
     void drawGlyph( SDL_Surface *dst_surface, Fontinfo *info, SDL_Color &color, char *text, int xy[2], bool shadow_flag, AnimationInfo *cache_info, SDL_Rect *clip, SDL_Rect &dst_rect );
     void drawChar( char* text, Fontinfo *info, bool flush_flag, bool lookback_flag, SDL_Surface *surface, AnimationInfo *cache_info, int abs_offset=0, SDL_Rect *clip=NULL );
     void drawString( const char *str, uchar3 color, Fontinfo *info, bool flush_flag, SDL_Surface *surface, int abs_offset=0, SDL_Rect *rect = NULL, AnimationInfo *cache_info=NULL, bool skip_whitespace_flag=true );

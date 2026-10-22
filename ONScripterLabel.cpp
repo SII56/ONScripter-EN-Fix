@@ -733,6 +733,7 @@ ONScripterLabel::ONScripterLabel()
     mp3fade_start = 0;
     wm_edit_string[0] = '\0';
     png_rgb_opaque = false;
+    fit_legacy_ascii = false;
 #ifdef PNG_AUTODETECT_NSCRIPTER_MASKS
     png_mask_type = PNG_MASK_AUTODETECT;
 #elif defined PNG_FORCE_NSCRIPTER_MASKS

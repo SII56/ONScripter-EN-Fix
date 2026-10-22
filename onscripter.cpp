@@ -79,6 +79,7 @@ static void optionHelp()
     printf( "      --use-app-icons\tuse the icns for the current application, if bundled/embedded\n");
     printf( "      --gameid id\t\tset game identifier (like with game.id)\n");
     printf( "      --encoding name\tscript encoding: auto (default), gbk, cp932, utf8\n");
+    printf( "      --fit-legacy-ascii\tfit wide ASCII glyphs into legacy half-width cells\n");
 #ifndef NO_LAYER_EFFECTS
     printf( "      --no-layers\tignore layer-based cmds\n");
 #endif
@@ -249,6 +250,9 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
             else if ( !strcmp( argv[0]+1, "-encoding" ) ){
                 consumeOptionArgument(argc, argv);
                 ons.setScriptEncoding(argv[0]);
+            }
+            else if ( !strcmp( argv[0]+1, "-fit-legacy-ascii" ) ){
+                ons.setFitLegacyASCII();
             }
             else if ( !strcmp( argv[0]+1, "-gameid" ) ){
                 consumeOptionArgument(argc, argv);

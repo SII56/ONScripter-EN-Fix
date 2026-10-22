@@ -80,6 +80,23 @@ RGBA PNGs continue to use their alpha channels. Defaults for other games remain
 unchanged, and a later `--force-png-nscmask` overrides this setting. Do not enable
 it for games that intentionally store right-half masks in RGB PNGs.
 
+## Optional legacy English glyph fitting
+
+GBK and CP932 scripts reserve half a character cell for each ASCII letter. Some
+game fonts have wider proportional letters such as W and M, which can overlap.
+Use `--fit-legacy-ascii`, or add `fit-legacy-ascii` to the game's `ons.cfg`, to
+horizontally fit overflowing printable ASCII glyphs inside their existing cells.
+This is an engine setting; scripts, font files and archives need no conversion.
+
+This opt-in mode preserves character positions, wrapping, menu/button geometry,
+Chinese glyphs and narrow ASCII glyphs. Wide letters become narrower; this is
+cell fitting rather than proportional English typesetting. Horizontal legacy text
+and text sprites are supported; UTF-8 and vertical text keep their existing behavior.
+Fitted antialiased glyph masks are cached by font, character and available width.
+
+Verify it with `python3 test/macos_ascii.py`; `--engine`, `--isolated`, `--font`
+and `--output` work as in the other runtime checks.
+
 ## Build and package
 
 Building requires Xcode Command Line Tools and Homebrew. These are developer
