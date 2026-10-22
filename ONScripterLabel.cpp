@@ -44,6 +44,9 @@
 #include "graphics_resize.h"
 #include <cstdio>
 #include <fstream>
+#ifdef __APPLE__
+#include "MacOSSupport.h"
+#endif
 
 #ifdef MACOSX
 #include "cocoa_alertbox.h"
@@ -729,6 +732,7 @@ ONScripterLabel::ONScripterLabel()
     music_buffer_length = 0;
     mp3fade_start = 0;
     wm_edit_string[0] = '\0';
+    png_rgb_opaque = false;
 #ifdef PNG_AUTODETECT_NSCRIPTER_MASKS
     png_mask_type = PNG_MASK_AUTODETECT;
 #elif defined PNG_FORCE_NSCRIPTER_MASKS
@@ -1133,6 +1137,13 @@ int ONScripterLabel::init()
             // to use the archive path!
             setSavePath(archive_path.get_path(0));
         }
+#elif defined(__APPLE__) && !defined(MACOSX)
+        std::string path = MacOSSupport::saveDirectory(gameid);
+        if (path.empty()) {
+            fprintf(stderr, "Unable to create the per-user save directory.\n");
+            return -1;
+        }
+        setSavePath(path.c_str());
 #elif defined MACOSX
         // On Mac OS X, place in ~/Library/Application Support/<gameid>/
         char *path;
@@ -1310,6 +1321,17 @@ int ONScripterLabel::init()
             font_picker = -1;
             break;
     }
+#if defined(__APPLE__) && !defined(MACOSX)
+    if (font_picker == -1 && !default_font) {
+        std::string fallback = MacOSSupport::systemFont(script_h.enc.getEncoding() == Encoding::CODE_GBK);
+        if (!fallback.empty()) {
+            font_file = new char[fallback.size() + 1];
+            strcpy(font_file, fallback.c_str());
+            font_picker = FONT_MACOS_HIRAGINO;
+            fprintf(stderr, "Using the macOS system font: %s\n", font_file);
+        }
+    }
+#endif
     if (default_font) {
         font_file = default_font;
     }
@@ -1606,7 +1628,7 @@ void ONScripterLabel::resetSentenceFont()
     sentence_font.font_size_xy[1] = DEFAULT_FONT_SIZE;
     sentence_font.top_xy[0] = 21;
     sentence_font.top_xy[1] = 16;// + sentence_font.font_size;
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         sentence_font.num_xy[0] = 23;
     else
         // Needs to be half the equivalent value
@@ -1634,7 +1656,14 @@ bool ONScripterLabel::doErrorBox( const char *title, const char *errstr, bool /*
     //so let's switch to windowed mode just in case
     menu_windowCommand();
 
-#if defined(MACOSX)
+#if defined(__APPLE__) && !defined(MACOSX)
+    if (is_warning) {
+        if (!MacOSSupport::choice(title, errstr, "Exit", "Ignore",
+                                 script_h.enc.getEncoding())) return false;
+    } else {
+        MacOSSupport::alert(title, errstr, script_h.enc.getEncoding());
+    }
+#elif defined(MACOSX)
     if (is_simple && !is_warning)
         ONSCocoa::alertbox(title, errstr);
     else {

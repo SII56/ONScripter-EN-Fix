@@ -36,8 +36,9 @@
 // Ogapee's 20090331 release source code.
 
 #include "ONScripterLabel.h"
+#include <vector>
 
-#if defined(LINUX) || defined(MACOSX)
+#if defined(LINUX) || defined(MACOSX) || defined(__APPLE__)
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -60,13 +61,18 @@ extern "C" void c2pstrcpy(Str255 dst, const char *src);	//#include <TextUtils.h>
 
 void ONScripterLabel::searchSaveFile( SaveFileInfo &save_file_info, int no )
 {
-    char file_name[256];
+    save_file_info.valid = false;
+    save_file_info.realPath.clear();
+    // Match the writer's directory, including an explicit savedir override.
+    const char *root = script_h.savedir ? script_h.savedir : script_h.save_path;
+    std::vector<char> file_name_storage(strlen(root ? root : "") + 40);
+    char *file_name = &file_name_storage[0];
 
     bool use_fullwidth = (script_h.system_menu_script == ScriptHandler::JAPANESE_SCRIPT);
     script_h.getStringFromInteger( save_file_info.sjis_no, no,
                                   (num_save_file >= 10)?2:1,
                                   false, use_fullwidth );
-#if defined(LINUX) || defined(MACOSX)
+#if defined(LINUX) || defined(MACOSX) || defined(__APPLE__)
     if (script_h.savedir)
         sprintf( file_name, "%ssave%d.dat", script_h.savedir, no );
     else
@@ -189,10 +195,7 @@ void ONScripterLabel::searchSaveFile( SaveFileInfo &save_file_info, int no )
                                    save_file_info.minute, 2,
                                    true, use_fullwidth );
 
-    // Should already by null/unassigned when passed in as argument.
-    // This isn't our job to manage here.
-    save_file_info.realPath = (char *)malloc(sizeof(char) * (strlen(file_name)+1));
-    strcpy(save_file_info.realPath, file_name);
+    save_file_info.realPath = file_name;
 }
 
 int ONScripterLabel::loadSaveFile( int no, bool input_flag )

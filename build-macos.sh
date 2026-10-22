@@ -37,7 +37,7 @@ done
 # Makefile.extlibs (see the ifeq ($(SYS),MacOSX) block there). Nothing is
 # pre-built by hand here; make's dependency order handles it.
 
-if [ ! -f Makefile ]; then
+if [ ! -f Makefile ] || [ configure -nt Makefile ]; then
     echo "==> configure"
     ./configure
 fi

@@ -134,6 +134,7 @@ public:
     void saveGlovalData(bool no_error=false);
     void setArchivePath(const char *path);
     void setSavePath(const char *path);
+    void setScriptEncoding(const char *name);
     void setNsaOffset(const char *off);
 
 #ifdef MACOSX
@@ -467,7 +468,7 @@ protected:
     /* Save/Load related variables */
     struct SaveFileInfo{
         bool valid;
-        char *realPath;
+        std::string realPath;
         int  month, day, hour, minute;
         char sjis_no[5];
         char sjis_month[5];

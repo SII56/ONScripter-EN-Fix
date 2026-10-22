@@ -124,7 +124,7 @@ int Fontinfo::getRemainingLine()
 
 int Fontinfo::x(int encoding)
 {
-    if (encoding == Encoding::CODE_CP932)
+    if (encoding != Encoding::CODE_UTF8)
         // Multiplies current column by character pixel count to get offset
         return xy[0]*pitch_xy[0]/2 + top_xy[0] + line_offset_xy[0] + ruby_offset_xy[0];
     else
@@ -231,7 +231,7 @@ SDL_Rect Fontinfo::calcUpdatedArea(int start_xy[2], int ratio1, int ratio2, int 
 
     if (tateyoko_mode == YOKO_MODE){
         if (start_xy[1] == xy[1]){
-            if (encoding == Encoding::CODE_CP932) {
+            if (encoding != Encoding::CODE_UTF8) {
                 rect.x = top_xy[0] + pitch_xy[0]*start_xy[0]/2;
                 rect.w = pitch_xy[0]*(xy[0]-start_xy[0])/2+1;
             } else {
@@ -242,7 +242,7 @@ SDL_Rect Fontinfo::calcUpdatedArea(int start_xy[2], int ratio1, int ratio2, int 
         }
         else{
             rect.x = top_xy[0];
-            if (encoding == Encoding::CODE_CP932) {
+            if (encoding != Encoding::CODE_UTF8) {
                 rect.w = pitch_xy[0]*num_xy[0];
             } else {
                 // My rehashed analysis: top_xy is based on Fontinfo::xy
@@ -251,7 +251,7 @@ SDL_Rect Fontinfo::calcUpdatedArea(int start_xy[2], int ratio1, int ratio2, int 
                 rect.w = xy[0]-start_xy[0];
             }
         }
-        if (encoding == Encoding::CODE_CP932) {
+        if (encoding != Encoding::CODE_UTF8) {
             rect.y = top_xy[1] + start_xy[1]*pitch_xy[1]/2;
             rect.h = pitch_xy[1]*(xy[1]-start_xy[1]+2)/2;
         } else {

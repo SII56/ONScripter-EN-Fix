@@ -23,7 +23,23 @@ jobs:
         ./onscripter-en --version
         ./onscripter-en --help | head -3
 
+    - name: build resource tools and run unit tests
+      run: |
+        make -j4 tools
+        make check
+
+    - name: package standalone app
+      run: ./package-macos.sh
+
+    - name: verify bundled runtime
+      run: |
+        python3 test/macos_runtime.py --engine dist/ONScripter-EN.app/Contents/MacOS/onscripter-en --isolated
+        python3 test/macos_encoding.py --engine dist/ONScripter-EN.app/Contents/MacOS/onscripter-en --isolated
+
+    - name: archive app
+      run: ditto -c -k --sequesterRsrc --keepParent dist/ONScripter-EN.app dist/ONScripter-EN.zip
+
     - uses: actions/upload-artifact@v4
       with:
-        name: onscripter-en.macOS.arm64
-        path: onscripter-en
+        name: onscripter-en.macOS.${{ runner.arch }}
+        path: dist/ONScripter-EN.zip

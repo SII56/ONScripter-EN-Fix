@@ -34,6 +34,9 @@
 #include "SDL_main.h"
 
 #include <cstdio>
+#ifdef __APPLE__
+#include "MacOSSupport.h"
+#endif
 
 #define CFG_FILE "ons.cfg"
 
@@ -60,6 +63,9 @@ static void optionHelp()
     printf( "  -r, --root path\tset the root path to the archives\n");
     printf( "  -s, --save path\tset the path to use for saved games (default: folder in All Users profile)\n");
     printf( "      --current-user-appdata\tuse the current user's AppData folder instead of AllUsers' AppData\n");
+#elif defined(__APPLE__) && !defined(MACOSX)
+    printf( "  -r, --root path\tset the game folder (app detects adjacent scripts, then opens a chooser)\n");
+    printf( "  -s, --save path\tset the save folder (default: ~/Library/Application Support/ONScripter-EN/<gameid>)\n");
 #elif defined MACOSX
     printf( "  -r, --root path\tset the root path to the archives (default: Resources in ONScripter bundle)\n");
     printf( "  -s, --save path\tset the path to use for saved games (default: folder in ~/Library/Application Support)\n");
@@ -72,6 +78,7 @@ static void optionHelp()
 #endif
     printf( "      --use-app-icons\tuse the icns for the current application, if bundled/embedded\n");
     printf( "      --gameid id\t\tset game identifier (like with game.id)\n");
+    printf( "      --encoding name\tscript encoding: auto (default), gbk, cp932, utf8\n");
 #ifndef NO_LAYER_EFFECTS
     printf( "      --no-layers\tignore layer-based cmds\n");
 #endif
@@ -86,6 +93,7 @@ static void optionHelp()
     printf( "      --scale\t\tscale game to native display size. Yields small sharp text.\n");
     printf( "      --no-movie-upscale\t\tdon't resize a movie larger than its native size.\n");
     printf( "      --force-png-alpha\t\talways use PNG alpha channels\n");
+    printf( "      --png-rgb-opaque\tuse whole opaque RGB PNGs in alpha mode (port compatibility)\n");
     printf( "      --force-png-nscmask\talways use NScripter-style masks\n");
     printf( "      --detect-png-nscmask\tdetect PNG alpha images that actually use masks\n");
     printf( "      --force-button-shortcut\tignore useescspc and getenter command\n");
@@ -131,6 +139,16 @@ static void optionVersion()
     exit(0);
 }
 
+static void consumeOptionArgument(int &argc, char **&argv)
+{
+    if (argc < 3) {
+        fprintf(stderr, "%s requires a value\n", argv[0]);
+        exit(2);
+    }
+    --argc;
+    ++argv;
+}
+
 static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasArchivePath)
 {
     argv++;
@@ -146,8 +164,7 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
                 ons.enableCDAudio();
             }
             else if ( !strcmp( argv[0]+1, "-cdnumber" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setCDNumber(atoi(argv[0]));
             }
 #ifdef WIN32
@@ -156,13 +173,11 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
             }
 #endif
             else if ( !strcmp( argv[0]+1, "-audiodriver" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setAudiodriver(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-audiobuffer" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setAudioBufferSize(atoi(argv[0]));
             }
             else if ( !strcmp( argv[0]+1, "-match-audiodevice-to-bgm" ) ){
@@ -172,18 +187,15 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
                 ons.setMatchBgmAudio(false);
             }
             else if ( !strcmp( argv[0]+1, "f" ) || !strcmp( argv[0]+1, "-font" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setFontFile(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-registry" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setRegistryFile(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-dll" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setDLLFile(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-english" ) ){
@@ -200,13 +212,11 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
             }
             else if ( !strcmp( argv[0]+1, "r" ) || !strcmp( argv[0]+1, "-root" ) ){
                 hasArchivePath = true;
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setArchivePath(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "s" ) || !strcmp( argv[0]+1, "-save" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setSavePath(argv[0]);
             }
 #ifdef WIN32
@@ -218,8 +228,7 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
                 ons.setUseAppIcons();
             }
             else if ( !strcmp( argv[0]+1, "-fileversion" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setFileVersion(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-fullscreen" ) ){
@@ -229,8 +238,7 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
                 ons.setWindowMode();
             }
             else if ( !strcmp( argv[0]+1, "-window-width" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setPreferredWidth(argv[0]);
             }
 #ifndef NO_LAYER_EFFECTS
@@ -238,22 +246,23 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
                 ons.setNoLayers();
             }
 #endif
+            else if ( !strcmp( argv[0]+1, "-encoding" ) ){
+                consumeOptionArgument(argc, argv);
+                ons.setScriptEncoding(argv[0]);
+            }
             else if ( !strcmp( argv[0]+1, "-gameid" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setGameIdentifier(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-nsa-offset" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setNsaOffset(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-force-button-shortcut" ) ){
                 ons.enableButtonShortCut();
             }
             else if ( !strcmp( argv[0]+1, "-automode-time" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setPreferredAutomodeTime(argv[0]);
             }
             else if ( !strcmp( argv[0]+1, "-enable-wheeldown-advance" ) ){
@@ -293,8 +302,7 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
                 ons.setStrict();
             }
             else if ( !strcmp( argv[0]+1, "-key-exe" ) ){
-                argc--;
-                argv++;
+                consumeOptionArgument(argc, argv);
                 ons.setKeyEXE(argv[0]);
             }
 #ifdef RCA_SCALE
@@ -311,6 +319,9 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
             else if ( !strcmp( argv[0]+1, "-detect-png-nscmask" ) ){
                 ons.setMaskType( ONScripterLabel::PNG_MASK_AUTODETECT );
             }
+            else if ( !strcmp( argv[0]+1, "-png-rgb-opaque" ) ){
+                ons.setPngRGBOpaque();
+            }
             else if ( !strcmp( argv[0]+1, "-force-png-alpha" ) ){
                 ons.setMaskType( ONScripterLabel::PNG_MASK_USE_ALPHA );
             }
@@ -326,8 +337,6 @@ static void parseOptions(int argc, char **argv, ONScripterLabel &ons, bool &hasA
         else if (!hasArchivePath) {
             hasArchivePath = true;
             ons.setArchivePath(argv[0]);
-            argc--;
-            argv++;
         }
         else{
             optionHelp();
@@ -459,7 +468,29 @@ int main( int argc, char **argv )
     } else
 #endif
     parseOptionFile(CFG_FILE, ons, hasArchivePath);
+
+#if defined(__APPLE__) && !defined(MACOSX)
+    // Adjacent game defaults precede explicit command-line options.
+    if (!hasArchivePath && MacOSSupport::isAppBundle()) {
+        std::string adjacent = MacOSSupport::adjacentGameDirectory();
+        if (!adjacent.empty()) {
+            ons.setArchivePath(adjacent.c_str());
+            hasArchivePath = true;
+            parseOptionFile((adjacent + "/" CFG_FILE).c_str(), ons, hasArchivePath);
+        }
+    }
+#endif
     parseOptions(argc, argv, ons, hasArchivePath);
+
+#if defined(__APPLE__) && !defined(MACOSX)
+    if (!hasArchivePath && MacOSSupport::isAppBundle()) {
+        std::string gamePath = MacOSSupport::adjacentGameDirectory();
+        if (gamePath.empty()) gamePath = MacOSSupport::chooseGameDirectory();
+        if (gamePath.empty()) return 0;
+        ons.setArchivePath(gamePath.c_str());
+        parseOptionFile((gamePath + "/" CFG_FILE).c_str(), ons, hasArchivePath);
+    }
+#endif
 
     // ----------------------------------------
     // Run ONScripter

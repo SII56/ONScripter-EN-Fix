@@ -76,6 +76,7 @@ ScriptHandler::ScriptHandler()
     root_array_variable = NULL;
 
     screen_width = 640;
+    script_encoding_override = -1;
     screen_height = 480;
     global_variable_border = 200;
     
@@ -673,7 +674,7 @@ const char *ScriptHandler::readToken(bool check_pretext)
                                     if (*buf == '`')
                                         invar_1byte_mode = !invar_1byte_mode;
 #ifdef readt_testing
-                                    n = enc.getBytes(ch);
+                                    n = enc.getBytes(*buf);
                                     if (tmp_count+n >= STRING_BUFFER_LENGTH)
                                         errorAndExit("readToken: var string length exceeds 2048 bytes.");
                                     if ((*buf == '\\') || (*buf == BACKSLASH)) {
@@ -683,6 +684,8 @@ const char *ScriptHandler::readToken(bool check_pretext)
                                         *buf++ = BACKSLASH;
                                     } else {
                                         for (int i=0; i<n; i++) {
+                                            if (*buf == '\0' || *buf == 0x0a)
+                                                errorAndExit("readToken: incomplete multi-byte character in variable string.");
                                             saved_string_buffer[tmp_count++] = *buf++;
                                         }
                                     }
@@ -996,7 +999,7 @@ void ScriptHandler::skipToken()
     bool quote_flag = false;
     bool text_flag = false;
     while(1){
-        if ( *buf == 0x0a ||
+        if ( *buf == '\0' || *buf == 0x0a ||
              (!quote_flag && !text_flag && (*buf == ':' || *buf == ';') ) ) break;
         if ( *buf == '"' ) quote_flag = !quote_flag;
 
@@ -1506,6 +1509,22 @@ int ScriptHandler::getStringFromInteger( char *buffer, int no, int num_column,
 
     // Full-width characters
     int code = enc.getEncoding();
+    if (code == Encoding::CODE_GBK) {
+        int cursor = 0;
+        for (i = 0; i < num_space; ++i) {
+            buffer[cursor++] = (char)(is_zero_inserted ? 0xa3 : 0xa1);
+            buffer[cursor++] = (char)(is_zero_inserted ? 0xb0 : 0xa1);
+        }
+        if (num_minus) { buffer[cursor++] = (char)0xa3; buffer[cursor++] = (char)0xad; }
+        int end = cursor + num_digit * 2;
+        for (i = end - 2; i >= cursor; i -= 2) {
+            buffer[i] = (char)0xa3;
+            buffer[i+1] = (char)(0xb0 + no % 10);
+            no /= 10;
+        }
+        buffer[end] = '\0';
+        return end;
+    }
     int n = 2; // bytes per character
     if (code == Encoding::CODE_UTF8)
         n = 3;
@@ -1627,6 +1646,7 @@ bool tokenMatch(char**buffer, const char (&token)[tTokenSize])
 
 int ScriptHandler::readScript( DirPaths &path )
 {
+    enc.setEncoding(Encoding::CODE_CP932);
     archive_path = &path;
 
     FILE *fp = NULL;
@@ -1780,6 +1800,13 @@ int ScriptHandler::readScript( DirPaths &path )
         }
     }
     delete[] tmp_script_buf;
+
+    if (script_encoding_override >= 0)
+        enc.setEncoding(script_encoding_override);
+    else if (enc.getEncoding() != Encoding::CODE_UTF8)
+        enc.setEncoding(Encoding::detectLegacyEncoding(script_buffer, p_script_buffer - script_buffer));
+    fprintf(stderr, "Script encoding: %s\n", enc.getEncoding() == Encoding::CODE_GBK ? "GBK" :
+        enc.getEncoding() == Encoding::CODE_UTF8 ? "UTF-8" : "CP932");
 
     // Haeleth: Search for gameid file (this overrides any builtin
     // ;gameid directive, or serves its purpose if none is available)

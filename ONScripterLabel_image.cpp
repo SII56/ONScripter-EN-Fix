@@ -54,6 +54,12 @@ SDL_Surface *ONScripterLabel::loadImage( char *filename, bool *has_alpha )
 
     if ( has_alpha ){
         *has_alpha = (tmp->format->Amask != 0);
+        // Some ports use whole RGB PNGs under transmode alpha, rather than
+        // NScripter's left-image/right-mask convention. Keep this opt-in.
+        const char *extension = strrchr(filename, '.');
+        if (!*has_alpha && png_rgb_opaque && extension &&
+            SDL_strcasecmp(extension, ".png") == 0)
+            *has_alpha = true;
         if (!(*has_alpha) && (tmp->flags & SDL_SRCCOLORKEY)){
             has_colorkey = true;
             colorkey = tmp->format->colorkey;

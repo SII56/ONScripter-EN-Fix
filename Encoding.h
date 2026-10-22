@@ -23,12 +23,15 @@
 
 #ifndef __ENCODING_H__
 #define __ENCODING_H__
+#include <cstddef>
+#include <string>
 
 class Encoding
 {
 public:
     enum { CODE_CP932 = 0,
-           CODE_UTF8 = 1
+           CODE_UTF8 = 1,
+           CODE_GBK = 2
     };
     
     Encoding();
@@ -43,6 +46,8 @@ public:
     int getNum(const unsigned char *buf);
     
     unsigned short getUTF16(const char *text, int code = -1);
+    static int detectLegacyEncoding(const char *text, size_t length);
+    static bool convert(const std::string &input, int from, int to, std::string &output);
 
 private:
     int code;

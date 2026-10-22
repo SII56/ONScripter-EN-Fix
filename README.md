@@ -25,6 +25,15 @@ We have now come full circle.  In the words of *True Remembrance*:
 As of April 2023, [onscripter-insani](https://github.com/insani-org/onscripter-insani) is a sister project to ONScripter-EN.  This is a branch of ONScripter which focuses on portability of compilation and support of modern macOS, as well as on continued support of insani's indie novel game localizations.  It does not have (and does not plan to add) many of the enhancements that are in ONScripter-EN, and the plan of that project is to remain as close to upstream as possible.  For your novel game localizations, we (and insani) recommend ONScripter-EN over onscripter-insani.
 
 ## Playing Games
+
+On this macOS fork, put the standalone app beside the game script and open it.
+If no script is found beside the app, choose a game folder in the dialog. No Homebrew
+is needed on the target machine. See [macOS instructions](MACOS.md) for package
+requirements, save locations and verification.
+
+See [the engine review](CODE_REVIEW.md) for changes, verification and remaining
+improvement areas.
+
 Playing an existing game with ONScripter-EN requires two additional files to be added to the game directory:
 
 - A default font.  See [Fonts](#fonts) subsection below.
@@ -47,7 +56,7 @@ ONScripter-EN relies upon having a default font file available to it.  Historica
 
 If none of these are found, ONScripter-EN will attempt the following fallback fonts:
 
-- *macOS:* [Hiragino Maru Gothic](https://en.wikipedia.org/wiki/Hiragino)
+- *macOS:* [Hiragino Sans](https://en.wikipedia.org/wiki/Hiragino)
 - *Windows:* [MS Gothic](https://learn.microsoft.com/en-us/typography/font-list/ms-gothic)
 
 These two fonts are pre-installed on their respective operating systems.  MS Gothic has come pre-installed on Windows since Vista, and Hiragino Maru Gothic has come pre-installed on macOS since macOS was a wee little thing named MacOS X, and also code-named after big cats at that.

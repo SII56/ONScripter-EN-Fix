@@ -36,6 +36,9 @@
 #include "graphics_resize.h"
 #include "ShiftJISData.h"
 #include "version.h"
+#ifdef __APPLE__
+#include "MacOSSupport.h"
+#endif
 
 #include <cstdio>
 #include <sys/stat.h>
@@ -100,7 +103,11 @@ int ONScripterLabel::yesnoboxCommand()
         //The OS X dialog box routines are crashing when in fullscreen mode,
         //so let's switch to windowed mode just in case
         menu_windowCommand();
-#if defined(MACOSX)
+#if defined(__APPLE__) && !defined(MACOSX)
+        res = MacOSSupport::choice(title, msg, is_yesnobox ? "Yes" : "OK",
+                                  is_yesnobox ? "No" : "Cancel",
+                                  script_h.enc.getEncoding()) ? 1 : 0;
+#elif defined(MACOSX)
         bool selectedYes;
         if(is_yesnobox) {
             selectedYes = ONSCocoa::choicebox(title, msg, "Yes", "No", ONSCocoa::ENC_SJIS);
@@ -432,7 +439,7 @@ int ONScripterLabel::tateyokoCommand()
     }
 
     if (!in_textgosub)
-        if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
+        if (script_h.enc.getEncoding() != Encoding::CODE_UTF8) {
             sentence_font.setTateyokoMode( mode );
         } else {
             fprintf(stderr, "tateyoko: in UTF-8 mode, ignoring\n");
@@ -724,10 +731,7 @@ int ONScripterLabel::splitCommand()
 
         unsigned int c=0;
         while(save_buf[c] != delimiter && save_buf[c] != '\0'){
-            if (IS_TWO_BYTE(save_buf[c]))
-                c += 2;
-            else
-                c++;
+            c += script_h.enc.getBytes(save_buf[c]);
         }
         memcpy( token, save_buf, c );
         token[c] = '\0';
@@ -761,12 +765,7 @@ int ONScripterLabel::splitonceCommand()
     char *token = new char[strlen(save_buf)+1];
     unsigned int c=0;
     while(save_buf[c] != delimiter && save_buf[c] != '\0'){
-        // TODO decide based on encoding, and if UTF-8 use byte number checking function
-        // Is this also a problem in splitCommand?
-        if (IS_TWO_BYTE(save_buf[c]))
-            c += 2;
-        else
-            c++;
+        c += script_h.enc.getBytes(save_buf[c]);
     }
     // Copy that much of save_buf into token
     memcpy( token, save_buf, c );
@@ -916,6 +915,8 @@ int ONScripterLabel::shellCommand()
         SDL_UnloadObject(shdll);
     }
     
+#elif defined(__APPLE__) && !defined(MACOSX)
+    MacOSSupport::openURL(script_h.readStr(), script_h.enc.getEncoding());
 #elif defined MACOSX
     ONSCocoa::open_url(script_h.readStr(), ONSCocoa::ENC_SJIS);
 #elif defined LINUX
@@ -1511,7 +1512,7 @@ int ONScripterLabel::savefileremoveCommand()
     searchSaveFile( info, no );
 
     if (info.valid == true)
-        std::remove(info.realPath);
+        std::remove(info.realPath.c_str());
 
     return RET_CONTINUE;
 }
@@ -2079,7 +2080,10 @@ int ONScripterLabel::mesboxCommand()
     char *msg = new char[strlen(buf)+1];
     sprintf(msg,"%s",buf);
     const char *title = script_h.readStr();
-#if defined(MACOSX)
+#if defined(__APPLE__) && !defined(MACOSX)
+    menu_windowCommand();
+    MacOSSupport::alert(title, msg, script_h.enc.getEncoding());
+#elif defined(MACOSX)
     //The OS X dialog box routines are crashing when in fullscreen mode,
     //so let's switch to windowed mode just in case
     menu_windowCommand();
@@ -2927,14 +2931,14 @@ int ONScripterLabel::gettagCommand()
             if (buf){
                 const char *buf_start = buf;
 
-                if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
+                if (script_h.enc.getEncoding() != Encoding::CODE_UTF8) {
                     bool in_1byte_mode = false;
                     while((in_1byte_mode || *buf != '/') && *buf != 0) {
                         if (*buf == '`') {
                             in_1byte_mode = !in_1byte_mode;
                             buf++;
-                        } else if (IS_TWO_BYTE(*buf))
-                            buf += 2;
+                        } else if (script_h.enc.getBytes(*buf) > 1)
+                            buf += script_h.enc.getBytes(*buf);
                         else
                             buf++;
                     }
@@ -3447,7 +3451,7 @@ int ONScripterLabel::fileexistCommand()
         sprintf(fn, "%s%s", script_h.save_path, buf);
         char* si = fn;
         do {
-            if (IS_TWO_BYTE(*si)) si++;
+            if (script_h.enc.getBytes(*si) > 1) si += script_h.enc.getBytes(*si) - 1;
             else if ( (*si == '\\') || (*si == '/') ) *si = DELIMITER;
         } while (*(++si));
         FILE* fp = std::fopen(fn, "rb"); // FIXME: failing even when file exists?!
@@ -4201,30 +4205,16 @@ int ONScripterLabel::cellCommand()
 int ONScripterLabel::captionCommand()
 {
     const char* buf = script_h.readStr();
-    size_t len = strlen(buf);
-
-    char *buf2 = new char[len*2+3];
-    char *buf1 = new char[len+1];
-    strcpy(buf1, buf);
-
-    /* I don't think that onsen supports UTF8_CAPTION
-     * -Galladite 2023-6-19
-     */
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
-        DirectReader::convertFromSJISToUTF8(buf2, buf1);
-    } else {
-        strcpy(buf2, buf1);
-    }
-    delete[] buf1;
-
-    setStr( &wm_title_string, buf2 );
-    setStr( &wm_icon_string,  buf2 );
-    delete[] buf2;
-    //printf("caption (utf8): '%s'\n", wm_title_string);
+    std::string caption(buf);
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8 &&
+        !Encoding::convert(buf, script_h.enc.getEncoding(), Encoding::CODE_UTF8, caption))
+        caption = "ONScripter-EN";
+    setStr( &wm_title_string, caption.c_str() );
+    setStr( &wm_icon_string, caption.c_str() );
     SDL_WM_SetCaption( wm_title_string, wm_icon_string );
 #ifdef WIN32
     //convert from UTF-8 to Wide (Unicode) and thence to system ANSI
-    len = MultiByteToWideChar(CP_UTF8, 0, wm_title_string, -1, NULL, 0);
+    size_t len = MultiByteToWideChar(CP_UTF8, 0, wm_title_string, -1, NULL, 0);
     wchar_t *u16_tmp = new wchar_t[len];
     MultiByteToWideChar(CP_UTF8, 0, wm_title_string, -1, u16_tmp, len);
     len = WideCharToMultiByte(CP_ACP, 0, u16_tmp, -1, NULL, 0, NULL, NULL);

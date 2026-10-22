@@ -156,7 +156,11 @@ public:
         PNG_MASK_USE_ALPHA     = 1,
         PNG_MASK_USE_NSCRIPTER = 2
     };
-    inline void setMaskType( int mask_type ) { png_mask_type = mask_type; }
+    inline void setMaskType( int mask_type ) {
+        png_mask_type = mask_type;
+        if (mask_type != PNG_MASK_USE_ALPHA) png_rgb_opaque = false;
+    }
+    inline void setPngRGBOpaque() { png_rgb_opaque = true; }
     inline void setEnglishDefault()
         { script_h.default_script = ScriptHandler::LATIN_SCRIPT; }
     inline void setJapaneseDefault()
@@ -759,6 +763,7 @@ private:
     /* ---------------------------------------- */
     /* General image-related variables */
     int png_mask_type;
+    bool png_rgb_opaque;
 
     /* ---------------------------------------- */
     /* Background related variables */

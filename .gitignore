@@ -80,3 +80,10 @@ extlib/src/libpng-1.6.39/scripts/sym.out
 
 # local feature-test scratch area, never committed
 /demo/
+/dist/
+/test/test_Encoding
+/test/test_BaseReader
+/test/test_DirPaths
+/test/test_DirectReader
+/test/test_ShiftJISData
+/test/*.dSYM/

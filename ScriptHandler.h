@@ -316,6 +316,7 @@ public:
 
     BaseReader *cBR;
     Encoding enc;
+    int script_encoding_override; // -1: conservative automatic legacy detection
 
     enum LanguageScript {
         NO_SCRIPT_PREF  = 0,

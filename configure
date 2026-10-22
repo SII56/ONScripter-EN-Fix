@@ -1212,7 +1212,7 @@ MacOSX)
 cat >> Makefile <<_EOF
 
 TOOL_LIBS = -Lextlib/lib \\
-            $LINKjpeg $LINKpng \\
+            $LINKjpeg $LINKpng $LINKz \\
             $LINKbz2 -lm
 LIBS = -Lextlib/lib \\
        \$(shell \$(SDL_CONFIG) --libs)                \\
@@ -1221,11 +1221,16 @@ LIBS = -Lextlib/lib \\
        $LINKSDL_image $LINKjpeg $LINKpng $LINKz         \\
        $LINKSDL_mixer $LINKogg $LINKvorbis $LINKvorbisfile \\
        $LINKbz2 -lm -framework CoreFoundation \
-       -framework AudioToolbox -framework AudioUnit -framework CoreAudio
+       -framework AudioToolbox -framework AudioUnit -framework CoreAudio \\
+       -framework Cocoa -framework CoreText -liconv
 
 DEFS = -DUTF8_CAPTION -DUTF8_FILESYSTEM -DUSE_OGG_VORBIS
 NO_DEFAULT_ICON = true
-EXT_OBJS = $GFX_EXT_OBJS
+EXT_OBJS = MacOSSupport.o $GFX_EXT_OBJS
+.DEFAULT_GOAL := binary
+
+MacOSSupport.o: MacOSSupport.mm MacOSSupport.h
+	\$(CXX) -c -o \$@ \$(OSCFLAGS) \$(CXXSTD) MacOSSupport.mm
 
 _EOF
 ;;

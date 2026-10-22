@@ -60,6 +60,15 @@ const char* ONScripterLabel::getMessageString( MessageId which )
 {
     if (script_h.system_menu_script != ScriptHandler::JAPANESE_SCRIPT)
         return messages[0][which];
+    else if (script_h.enc.getEncoding() != Encoding::CODE_CP932) {
+        static std::string converted[2][8];
+        int code = script_h.enc.getEncoding();
+        std::string &message = converted[code == Encoding::CODE_GBK ? 1 : 0][which];
+        if (message.empty() && !Encoding::convert(messages[1][which],
+                Encoding::CODE_CP932, code, message))
+            return messages[0][which];
+        return message.c_str();
+    }
     else
         return messages[1][which];
 }
@@ -203,14 +212,14 @@ void ONScripterLabel::executeSystemMenu()
 
     // Top_xy: origin in pixels
     // Origin: half of the screen's width, minus half of the px width of the text
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.top_xy[0] = (ContractPos(screen_width) - menu_font.num_xy[0] * menu_font.pitch_xy[0]) / 2;
     else
         menu_font.top_xy[0] = (ContractPos(screen_width) - menu_font.num_xy[0]) / 2;
     menu_font.top_xy[1] = (ContractPos(screen_height) - menu_font.num_xy[1] * menu_font.pitch_xy[1]) / 2;
 
     // XY: measured in columns and rows (with px instead of columns in UTF-8 mode)
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.setXY( (menu_font.num_xy[0] - rmenu_link_width) / 2,
                          (menu_font.num_xy[1] - rmenu_link_num) / 2 );
     else
@@ -339,7 +348,7 @@ bool ONScripterLabel::executeSystemLoad()
 //    menu_font.setXY( (menu_font.num_xy[0] - (strlen( load_menu_name )+1) / 2) / 2, 0 );
 
     // Number of columns / UTF-8 px width
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.num_xy[0] = (strlen(save_item_name)+1)/2+2+13;
     else {
         if (menu_font.ttf_font == NULL) menu_font.openFont(font_file, screen_ratio1, screen_ratio2);
@@ -348,14 +357,14 @@ bool ONScripterLabel::executeSystemLoad()
     menu_font.num_xy[1] = num_save_file+2;
 
     // Text origin in px
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.top_xy[0] = (ContractPos(screen_width) - menu_font.num_xy[0] * menu_font.pitch_xy[0]) / 2;
     else
         menu_font.top_xy[0] = ((ContractPos(screen_width) - menu_font.num_xy[0]) / 2) / 2;
     menu_font.top_xy[1] = (ContractPos(screen_height) - menu_font.num_xy[1] * menu_font.pitch_xy[1]) / 2;
 
     // XY pos
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.setXY((menu_font.num_xy[0] - (strlen( load_menu_name )+1) / 2 ) / 2, 0);
     else
         menu_font.setXY((menu_font.num_xy[0] - (strpxlen(load_menu_name, &menu_font) +1) / 2) / 2 , 0);
@@ -381,7 +390,7 @@ bool ONScripterLabel::executeSystemLoad()
     SaveFileInfo save_file_info;
     for ( unsigned int i=1 ; i<=num_save_file ; i++ ){
         searchSaveFile( save_file_info, i );
-        if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+        if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
             menu_font.setXY( (menu_font.num_xy[0] - ((strlen( save_item_name )+1) / 2 + 15) ) / 2 );
         else
             // Probably still wrong lol
@@ -479,7 +488,7 @@ void ONScripterLabel::executeSystemSave()
     text_info.fill( 0, 0, 0, 0 );
 
     // Number of columns / UTF-8 px width
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.num_xy[0] = (strlen(save_item_name)+1)/2+2+13;
     else {
         if (menu_font.ttf_font == NULL) menu_font.openFont(font_file, screen_ratio1, screen_ratio2);
@@ -488,14 +497,14 @@ void ONScripterLabel::executeSystemSave()
     menu_font.num_xy[1] = num_save_file+2;
 
     // Text origin in px
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.top_xy[0] = (ContractPos(screen_width) - menu_font.num_xy[0] * menu_font.pitch_xy[0]) / 2;
     else
         menu_font.top_xy[0] = ((ContractPos(screen_width) - menu_font.num_xy[0]) / 2) / 2;
     menu_font.top_xy[1] = (ContractPos(screen_height) - menu_font.num_xy[1] * menu_font.pitch_xy[1]) / 2;
 
     // XY pos
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.setXY((menu_font.num_xy[0] - (strlen( save_menu_name )+1) / 2 ) / 2, 0);
     else
         menu_font.setXY((menu_font.num_xy[0] - (strpxlen(save_menu_name, &menu_font) +1) / 2) / 2 , 0);
@@ -521,7 +530,7 @@ void ONScripterLabel::executeSystemSave()
     for ( unsigned int i=1 ; i<=num_save_file ; i++ ){
         SaveFileInfo save_file_info;
         searchSaveFile( save_file_info, i );
-        if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+        if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
             menu_font.setXY( (menu_font.num_xy[0] - ((strlen( save_item_name )+1) / 2 + 15) ) / 2 );
         else
             // Probably still wrong lol
@@ -608,12 +617,12 @@ bool ONScripterLabel::executeSystemYesNo( int caller, int file_no )
         strcpy( name, getMessageString(MESSAGE_END_CONFIRM) );
 
 
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.num_xy[0] = strlen(name)/2;
     else
         menu_font.num_xy[0] = strpxlen(name, &menu_font);
     menu_font.num_xy[1] = 3;
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.top_xy[0] = (ContractPos(screen_width) - menu_font.num_xy[0] * menu_font.pitch_xy[0]) / 2;
     else
         menu_font.top_xy[0] = (ContractPos(screen_width) - menu_font.num_xy[0]) / 2;
@@ -634,7 +643,7 @@ bool ONScripterLabel::executeSystemYesNo( int caller, int file_no )
     flush( refreshMode() );
 
     int offset1, offset2;
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8) {
         offset1 = strlen(name)/5;
         offset2 = strlen(name)/2 - offset1;
     } else {
@@ -642,7 +651,7 @@ bool ONScripterLabel::executeSystemYesNo( int caller, int file_no )
         offset2 = strpxlen(name, &menu_font)/4;
     }
     strcpy( name, getMessageString(MESSAGE_YES) );
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.setXY(offset1-2, 2);
     else
         menu_font.setXY(offset1, 2);
@@ -651,7 +660,7 @@ bool ONScripterLabel::executeSystemYesNo( int caller, int file_no )
     button->no = 1;
 
     strcpy( name, getMessageString(MESSAGE_NO) );
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         menu_font.setXY(offset2, 2);
     else
         menu_font.setXY(offset2, 2);

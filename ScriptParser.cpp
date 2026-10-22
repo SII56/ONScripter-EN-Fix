@@ -749,6 +749,18 @@ void ScriptParser::setSavePath(const char *path)
     }
 }
 
+void ScriptParser::setScriptEncoding(const char *name)
+{
+    if (!strcmp(name, "auto")) script_h.script_encoding_override = -1;
+    else if (!strcmp(name, "gbk")) script_h.script_encoding_override = Encoding::CODE_GBK;
+    else if (!strcmp(name, "cp932") || !strcmp(name, "sjis")) script_h.script_encoding_override = Encoding::CODE_CP932;
+    else if (!strcmp(name, "utf8") || !strcmp(name, "utf-8")) script_h.script_encoding_override = Encoding::CODE_UTF8;
+    else {
+        fprintf(stderr, "Unknown script encoding '%s'; use auto, gbk, cp932 or utf8.\n", name);
+        exit(2);
+    }
+}
+
 void ScriptParser::setNsaOffset(const char *off)
 {
     int offset = atoi(off);
@@ -1097,7 +1109,14 @@ void ScriptParser::setStr( char **dst, const char *src, int num, bool to_utf8 )
         else{
             num = strlen(src);
 
-            if ( to_utf8 && script_h.enc.getEncoding() == Encoding::CODE_UTF8 ) {
+            if (to_utf8 && script_h.enc.getEncoding() == Encoding::CODE_GBK) {
+                std::string converted;
+                if (!Encoding::convert(src, Encoding::CODE_CP932, Encoding::CODE_GBK, converted))
+                    converted = "?";
+                *dst = new char[converted.size() + 1];
+                strcpy(*dst, converted.c_str());
+            }
+            else if ( to_utf8 && script_h.enc.getEncoding() == Encoding::CODE_UTF8 ) {
                 char *tmp_buf = new char[ num*2 + 1 ];
                 DirectReader::convertFromSJISToUTF8(tmp_buf, src);
                 num = strlen(tmp_buf);
@@ -1262,9 +1281,9 @@ void ScriptParser::setDefaultMenuLabels()
         setStr( &save_item_name, "Slot " );
     }
     else {
-        setStr( &save_menu_name, (const char*)shiftjis_data::menu_labels::save_menu_name );
-        setStr( &load_menu_name, (const char*)shiftjis_data::menu_labels::load_menu_name );
-        setStr( &save_item_name, (const char*)shiftjis_data::menu_labels::save_item_name );
+        setStr( &save_menu_name, (const char*)shiftjis_data::menu_labels::save_menu_name, -1, true );
+        setStr( &load_menu_name, (const char*)shiftjis_data::menu_labels::load_menu_name, -1, true );
+        setStr( &save_item_name, (const char*)shiftjis_data::menu_labels::save_item_name, -1, true );
     }
 }
 

@@ -1,120 +1,136 @@
-# macOS 构建说明（个人分支）
+# 在 macOS 上使用 ONScripter-EN
 
 [English](MACOS.md)
 
-本仓库是 [Galladite27/ONScripter-EN](https://github.com/Galladite27/ONScripter-EN) 的个人分支，
-目标只有一个：**让 ONScripter-EN 在 macOS（Apple Silicon / Intel）上能编译、能跑**。
+这是 ONScripter-EN 的个人 macOS 移植，保留 `COPYING` 中的许可证，不向上游提交 PR。
 
-上游明确表示暂不支持 macOS 构建（见其 README 的「Build Requirements」一节），
-其 `configure` 里的 Darwin 分支是 2000 年代 Xcode 时代的遗留物，已经不可用。
-本分支把这个分支修好，并走 insani 分支验证过的「sdl12-compat + 系统库」路线。
+## 使用独立应用包
 
-许可证保持 **GPL v2** 不变（见 `COPYING`）。
+解压后，把 `ONScripter-EN.app` 放到游戏入口脚本（如 `nscript.dat`、`0.txt` 或 `0.utf`）
+所在的目录，双击应用即可直接启动该游戏。应用旁边找不到支持的脚本时，才弹出游戏文件夹选择框。
+显式传入的 `--root` 始终优先。目标机器不需要安装
+Homebrew、Python、Xcode 或 SDL 等运行库；游戏脚本和素材仍需自行提供。
 
----
+应用包包含所有非系统动态库，包括兼容库动态加载的 SDL2，以及需要时的 SDL3。
+打包过程会重写依赖路径、检查是否仍引用外部库，并在完成后进行临时签名。
 
-## 快速开始
+不同架构需要分别构建。本机在 2026-10-22 生成的包是 **arm64，要求 macOS 27.0
+或以上**，这是所用动态库的最低系统要求决定的。打包脚本会综合主程序和所有库，
+将实际要求写入 `Contents/Info.plist`，不能直接宣称支持 macOS 11。
+使用旧版 SDK 和兼容依赖重新构建可能降低要求，但尚未验证；本次也未验证 Intel。
 
-```bash
-brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg dylibbundler \
-             autoconf automake libtool
-./build-macos.sh
+应用没有公证。从其他机器获取后，macOS 可能要求用户按系统正常流程批准打开。
+
+## 字体和存档
+
+优先使用游戏自带的 `default.ttf`、`.ttc`、`.otf` 或 `.otc`。没有时通过 CoreText
+寻找系统安装的 Hiragino Sans 字体（GBK 脚本优先使用系统华文黑体），不在应用包中复制或分发系统字体。
+对于依赖固定字宽的脚本，仍建议使用适合该游戏的等宽 CJK 字体。
+
+默认存档位置：
+
+```text
+~/Library/Application Support/ONScripter-EN/<游戏标识>/
 ```
 
-产物是同目录下的 `onscripter-en`（Mach-O arm64 / x86_64）。
+`--save PATH` 可以指定其他位置，脚本中的 `savedir` 相对于该目录。
+存档查询、时间显示和实际写入使用相同的路径。
+原来游戏目录里的存档不会自动迁移：可以通过 `--save` 继续指定原目录，或自行复制到新位置。
 
-## 环境要求
-
-- macOS 11+（本分支在 macOS 27 / arm64 上验证）
-- Xcode Command Line Tools（`xcode-select --install`）
-- Homebrew（Apple Silicon 默认在 `/opt/homebrew`）
-
-## 依赖说明
-
-| 依赖 | 来源 | 说明 |
-|---|---|---|
-| SDL 1.2 | Homebrew `sdl12-compat` | SDL2 之上的 1.2 ABI 兼容层，提供 `sdl-config` |
-| SDL_image / SDL_mixer / SDL_ttf | 仓库内置 `extlib/src` | 用系统 `sdl-config` 编译，静态链接 |
-| smpeg / freetype / bzip2 | Homebrew | 系统库 |
-| libpng / libjpeg / zlib / libogg / libvorbis | 仓库内置 | 静态链接 |
-
-**注意**：Homebrew 已不再提供 `sdl_image` / `sdl_mixer` / `sdl_ttf` 这三个 SDL1.2 名字的
-formula（现在只有 `sdl2_image` 等 SDL2 版本）。所以三个扩展库用仓库自带的 1.2 版本编译，
-这比引入 `sdl2_*`（会连带升级 freetype / harfbuzz / glib 等十几个包）干净得多。
-
----
-
-## 相对上游的改动
-
-全部在构建系统层面，**没有改任何引擎逻辑**。
-
-### 1. `configure` —— 给 Darwin 一个能用的分支
-
-- 删除 `DEFS` 里的 `-DMACOSX`。这个宏会打开源码里 97 处 2006 年的 Cocoa 胶水代码
-  （`#import <Foundation/...>`、`cocoa_alertbox.h`），而 `macosx/*.mm` 从来没被任何
-  Makefile 编译过，那套东西是死的。不定义它，代码走通用 POSIX 路径，和 insani 分支一致。
-- 删除 `-framework QuickTime`。该 framework 在 macOS 10.15 Catalina 已被移除。
-- 补上 `-framework AudioToolbox -framework AudioUnit -framework CoreAudio`，
-  SDL_mixer 的 `native_midi_macosx.c` 需要它们（`NewMusicSequence` 等符号）。
-- `$LINKz` 补进链接行，否则 libpng 的 `inflate` / `deflate` 找不到。
-- 删掉 `X11_messagebox.cpp` 及其在 `configure` 里的挂钩。该文件无条件
-  `#include <X11/Xlib.h>`，而 macOS 没有 X11 头（除非装 XQuartz）。
-- 让 macOS 也生成 `resources.h`（图标嵌入），否则 `ONScripterLabel.cpp` 的
-  `#include "resources.h"` 会失败。
-- 去掉 `-fpascal-strings`。
-
-### 2. `Makefile.extlibs` —— BSD sed 兼容
-
-两处 `sed -i` 改成 `perl -pi -e`。macOS 的 BSD sed 对 `-i` 的后缀参数处理与 GNU sed
-不同，`sed -i -e ...` 会报 `invalid command code`。
-
-### 3. `extlib/src/zlib-1.2.13/zutil.h`
-
-`TARGET_OS_MAC` 在现代 macOS SDK 里恒为真，导致 zlib 把 `fdopen` 定义成宏，
-和 SDK 的 `_stdio.h` 声明冲突。改为仅在 classic Mac 下生效。
-
-### 4. `extlib/src/libpng-1.6.39/pngpriv.h`
-
-同一类问题：`TARGET_OS_MAC` 为真时它会 `#include <fp.h>`，而 `fp.h` 在较新的 SDK 里已删除。
-
-### 5. `extlib/src/libvorbis-1.3.7/configure.ac`
-
-删掉 `-force_cpusubtype_ALL`。这是 PowerPC 时代给 Xcode 用的链接参数，现代 `ld`
-直接报 `unknown options`。
-
----
-
-## 运行游戏
-
-和上游一样，游戏目录里**必须**有一个字体文件（`default.ttf` / `.ttc` / `.otf` / `.otc`）。
-
-注意：ONScripter-EN **没有** macOS 系统字体回退（只有 insani 分支有，会用 Hiragino Maru
-Gothic）。没放字体时会直接 `no font file detected; exiting`。临时测试可以：
+也可以在终端运行：
 
 ```bash
-cp "/System/Library/Fonts/Supplemental/AppleGothic.ttf" <游戏目录>/default.ttf
+"ONScripter-EN.app/Contents/MacOS/onscripter-en" --root "/path/to/game"
 ```
 
-正式玩日文游戏建议用等宽 CJK 字体（Genjyuu Gothic X Monospace / Migu 2M / Sazanami Gothic）。
+## 老中文移植版的兼容设置
 
-## 已验证到什么程度
+引擎可直接读取 GBK 脚本，包括异或封装的 `nscript.dat`，不需要改写游戏文件。
+GBK 使用与 CP932 相同的固定字宽排版；UTF-8 仍采用引擎原有的另一套像素排版。
+只有整个脚本是有效 GBK、同时是无效 CP932 时才自动选 GBK；有歧义时保留 CP932。
+显式 `.utf` 文件继续使用 UTF-8。
 
-- `--help` / `--version` 正常
-- 最小脚本（`*define` / `game` / 一行文本）能解析、执行、正常退出
-- SDL 视频初始化（sdl12-compat）、字体加载、脚本解析链路都走通了
-- **没有跑过完整游戏**，音频 / 视频 / 存档 / 菜单都还没实测
+有歧义的游戏可以用 `--encoding gbk`，也可以在应用旁的 `ons.cfg` 中填写：
 
-## 已知限制
+```ini
+encoding=gbk
+```
 
-- **没有做 app bundle**。目前产物是裸二进制，存档默认写在游戏目录。
-  要做 `.app` 可以照抄 insani 分支的 `makedist.MacOSX.sh` + `-DAPPBUNDLE`。
-- **没有代码签名 / 公证**。自己本机用 `codesign -s - onscripter-en` 即可；
-  对外分发需要 Apple 开发者账号（$99/年）+ `notarytool`。
-- **MIDI**：走 SDL_mixer 的 `native_midi_macosx`（AudioToolbox），没有实测过 MIDI 游戏。
-- **arm64 没有 SSE/MMX 加速**。`configure` 的 `ARCH` 检测只认 x86/x86_64/ppc，
-  Apple Silicon 落到 `unknown`，于是 `USE_CPU_GFX=false`，走纯 C 路径。功能正常，只是慢一点。
+应用会读取自动发现的相邻游戏或手动选择的游戏目录中的 `ons.cfg`。
+命令行显式参数优先于相邻游戏的配置。
 
-## 与上游的关系
+部分移植版在 `transmode alpha` 下使用普通 RGB PNG。传统读取方式会把右半边
+当作遮罩，导致图片被裁掉一半。对于这类游戏，在 `ons.cfg` 另加一行：
 
-本分支**不打算向上游提 PR**，纯个人使用。上游的 macOS 支持由维护者自己规划，
-届时大概率也会走同样的「搬 insani 构建系统」路线。
+```ini
+png-rgb-opaque
+```
+
+该选项按不透明整图读取 RGB PNG；RGBA PNG 仍使用自身透明通道。
+它默认关闭，不影响其他游戏的传统遮罩行为。后指定的 `--force-png-nscmask`
+可以覆盖它。真正使用右半遮罩的游戏不应开启此选项。
+
+## 构建与打包
+
+只有构建机器需要 Xcode Command Line Tools 和 Homebrew；脚本会检查并安装所需依赖。
+
+```bash
+./build-macos.sh -j4
+make -j4 tools
+make check
+./package-macos.sh
+```
+
+产物位于 `dist/ONScripter-EN.app`。打包脚本拒绝覆盖已有应用，可传入其他输出位置：
+
+```bash
+./package-macos.sh "$PWD/dist/ONScripter-EN-next.app"
+```
+
+`build-macos.sh` 单独生成的裸程序仍依赖 Homebrew。复制或分发时应使用完整应用包。
+
+## 验证方式与结果
+
+```bash
+python3 test/macos_runtime.py
+python3 test/macos_encoding.py --engine dist/ONScripter-EN.app/Contents/MacOS/onscripter-en --isolated
+python3 test/macos_runtime.py --engine dist/ONScripter-EN.app/Contents/MacOS/onscripter-en --isolated
+python3 test/macos_runtime.py --engine dist/ONScripter-EN.app/Contents/MacOS/onscripter-en --isolated --dialogs
+```
+
+前两项无需手动输入；最后一项依次选择 No、Yes、Cancel、OK，再关闭中日文消息框。
+`--output PATH` 可将日志与截图保留在指定空目录，否则使用临时目录。
+
+本机已验证：
+
+- 资源工具全部编译成功，现有 38 项单元测试通过。
+- GBK／CP932 明文与封装脚本的字形和固定字宽像素一致，字符串与变量能存读档恢复，脚本文件保持不变。
+- RGB PNG 整图兼容、传统遮罩覆盖选项，以及游戏旁配置与命令行优先级。
+- 通过像素比对验证 RGBA 透明、颜色抠透明、不透明图片、传统右半遮罩和居中立绘。
+- 存读档往返恢复整数、字符串、背景和精灵。
+- 从不同工作目录启动时，存档存在性和真实月日查询正确；也覆盖了 `savedir` 子目录。
+- 系统字体回退，以及含空格和日文的游戏路径。
+- 应用放在游戏脚本旁时，无需 `--root`，从其他工作目录启动也能自动识别。
+- 原生确认框的肯定、否定返回值，以及中日文消息显示。
+- 从 PATH 中移除 Homebrew 后，应用包仍通过运行测试；加载日志确认使用包内库，没有加载 Homebrew 库。
+
+CI 已加入工具构建、单元测试、应用打包和包内运行验证，上传产物为包含应用的 ZIP。
+原生对话框需要手动验证。本地通过不代表已经运行了远程 CI。
+
+## 实现说明与剩余限制
+
+旧 `MACOSX` 宏继续关闭。新的 `MacOSSupport.mm` 独立提供现代系统对话框、游戏目录选择、
+用户存档目录、打开网址和字体查找，不重新启用旧 Xcode 工程。
+存档查询显式识别现代 macOS，工具链接也补上了 zlib。
+
+此前的 Darwin 链接、内置 SDL_image/SDL_ttf 配置、BSD 文本处理兼容，以及
+zlib/libpng/libvorbis 的 SDK 修补保留。`configure` 更新后，构建脚本会重新生成 Makefile。
+
+RGBA 精灵应显式使用 `:a;` 标签；`:l;` 表示左上角颜色抠透明，`:c;` 表示不透明。
+PNG alpha 命令行选项不会替代图片标签。`csp` 是清除精灵，`vsp` 是控制显隐，
+`msp` 的位移参数是增量。
+
+尚未验证完整商业游戏、实际音频听感、视频、MIDI 循环和长时间交互存读档菜单。
+arm64 仍使用通用 C 图形路径；仅增加架构识别不会自动获得 NEON 加速。
+
+当前 SMPEG 视频路径不支持 MP4 开场动画；出现提示并跳过开场动画，与文字乱码或 PNG 兼容问题无关。

@@ -144,6 +144,12 @@ static inline bool isRotationRequired(const char *text, Encoding enc)
         return true;
     //if ( !IS_TWO_BYTE(text[0]) )    // ascii, halfwidth kana
     //    return true;
+    if (enc.getEncoding() == Encoding::CODE_GBK) {
+        unsigned short u = enc.getUTF16(text);
+        return u == 0x2014 || u == 0x2015 || u == 0x2026 || u == 0x2025 ||
+               u == 0x300c || u == 0x300d || u == 0x300e || u == 0x300f ||
+               u == 0xff08 || u == 0xff09;
+    }
     //fullwidth commas or full-stops
     return ((text[0] == (char)0x81) &&
             ( ((text[1] >= 0x5b) && (text[1] <= 0x5d)) ||  //hyphens
@@ -153,15 +159,22 @@ static inline bool isRotationRequired(const char *text, Encoding enc)
               (text[1] == (char)0x80) ));                  //division sign
 }
 
-static inline bool isTranslationRequired(const char *text)
+static inline bool isTranslationRequired(const char *text, Encoding enc)
 {
+    // Full-width Chinese punctuation must not be interpreted as SJIS bytes.
+    if (enc.getEncoding() == Encoding::CODE_GBK) {
+        unsigned short u = enc.getUTF16(text);
+        return u == 0x3001 || u == 0x3002 || u == 0xff0c || u == 0xff0e;
+    }
     //fullwidth commas or full-stops
     return ((text[0] == (char)0x81) &&
             (text[1] >= 0x41) && (text[1] <= 0x44));
 }
 
-static inline bool isNonPrinting(const char *text)
+static inline bool isNonPrinting(const char *text, Encoding enc)
 {
+    if (enc.getEncoding() == Encoding::CODE_GBK)
+        return (unsigned char)text[0] <= 0x20 || enc.getUTF16(text) == 0x3000;
     //control chars or fullwidth space
     return ( ((unsigned char) text[0] <= 0x20) ||
              ((text[0] == (char)0x81) && (text[1] == (char)0x40)) );
@@ -212,18 +225,7 @@ void ONScripterLabel::drawGlyph( SDL_Surface *dst_surface, Fontinfo *info, SDL_C
 
     unsigned short unicode;
 
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
-        if (IS_TWO_BYTE(text[0])){
-            unsigned index = ((unsigned char*)text)[0];
-            index = index << 8 | ((unsigned char*)text)[1];
-            unicode = convSJIS2UTF16( index );
-        }
-        else{
-            unicode = convSJIS2UTF16( ((unsigned char*)text)[0] );
-        }
-    } else {
-        unicode = convUTF8ToUTF16((const char**)&text);
-    }
+    unicode = script_h.enc.getUTF16(text);
 
     int minx, maxx, miny, maxy, advanced;
 #if 0
@@ -246,7 +248,7 @@ void ONScripterLabel::drawGlyph( SDL_Surface *dst_surface, Fontinfo *info, SDL_C
 
     //Mion: to display vertical text more cleanly
     if ( (info->getTateyokoMode() == Fontinfo::TATE_MODE) &&
-         isTranslationRequired(text) ){
+         isTranslationRequired(text, script_h.enc) ){
         dst_rect.x = xy[0] + ExpandPos(info->font_size_xy[0]) - maxx;
         dst_rect.y = xy[1] + minx;
     }
@@ -297,11 +299,11 @@ void ONScripterLabel::drawChar( char* text, Fontinfo *info, bool flush_flag,
 
     if ( info->isEndOfLine() ){
         // Kunrakun: simple fix for overlapping csel dialogue (issue #83)
-        if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+        if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
             info->newLine();
         
         for (int i=0 ; i<indent_offset ; i++)
-            if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
+            if (script_h.enc.getEncoding() != Encoding::CODE_UTF8) {
                 sentence_font.advanceCharInHankaku(2);
             } else {
                 // Don't worry about it (untested)
@@ -310,8 +312,8 @@ void ONScripterLabel::drawChar( char* text, Fontinfo *info, bool flush_flag,
 
         if ( lookback_flag ){
             for (int i=0 ; i<indent_offset ; i++){
-                current_page->add(0x81);
-                current_page->add(0x40);
+                current_page->add(script_h.enc.getEncoding() == Encoding::CODE_GBK ? 0xa1 : 0x81);
+                current_page->add(script_h.enc.getEncoding() == Encoding::CODE_GBK ? 0xa1 : 0x40);
             }
         }
     }
@@ -339,7 +341,7 @@ void ONScripterLabel::drawChar( char* text, Fontinfo *info, bool flush_flag,
     xy[0] = abs_offset + ExpandPos(info->x(script_h.enc.getEncoding()));
     xy[1] = ExpandPos(info->y());
 
-    if ( !isNonPrinting(&out_text[0]) || script_h.enc.getEncoding() == Encoding::CODE_UTF8 ){
+    if ( !isNonPrinting(&out_text[0], script_h.enc) || script_h.enc.getEncoding() == Encoding::CODE_UTF8 ){
         //don't bother drawing non-printing glyphs - unless it's UTF-8
         //mode - spaces may have variable width -Galladite 2023-6-22
         SDL_Color color;
@@ -368,8 +370,8 @@ void ONScripterLabel::drawChar( char* text, Fontinfo *info, bool flush_flag,
 
     /* ---------------------------------------- */
     /* Update text buffer */
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
-        if (IS_TWO_BYTE(text[0]))
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8) {
+        if (script_h.enc.getBytes(text[0]) > 1)
             info->advanceCharInHankaku(2);
         else
             info->advanceCharInHankaku(1);
@@ -381,7 +383,7 @@ void ONScripterLabel::drawChar( char* text, Fontinfo *info, bool flush_flag,
     if ( lookback_flag ){
         /*
         current_page->add( text[0] );
-        if (IS_TWO_BYTE(text[0]))
+        if (script_h.enc.getBytes(text[0]) > 1)
             current_page->add( text[1] );
         */
         int n = script_h.enc.getBytes(text[0]);
@@ -506,7 +508,7 @@ void ONScripterLabel::drawString( const char *str, uchar3 color, Fontinfo *info,
                 if (info->isEndOfLine(i)){
                     info->newLine();
                     for (int i=0 ; i<indent_offset ; i++){
-                        if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+                        if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
                             sentence_font.advanceCharInHankaku(2);
                         else
                             sentence_font.advanceCharInHankaku(info->pitch_xy[0]);
@@ -840,7 +842,7 @@ void ONScripterLabel::startRuby(char *buf, Fontinfo &info)
     }
 
     // Don't do this in UTF-8 mode
-    if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+    if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
         ruby_font.ttf_font = NULL;
 
     if ( ruby_struct.font_size_xy[0] != -1 )
@@ -867,7 +869,7 @@ void ONScripterLabel::startRuby(char *buf, Fontinfo &info)
             break;
         }
         else {
-            if (script_h.enc.getEncoding() == Encoding::CODE_CP932) {
+            if (script_h.enc.getEncoding() != Encoding::CODE_UTF8) {
                 n=1;
                 if ( ruby_struct.stage == RubyStruct::BODY )
                     ruby_struct.body_count++;
@@ -1054,8 +1056,8 @@ bool ONScripterLabel::processText()
         line_has_nonspace = true;
 
         int spacing;
-        if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
-            spacing = IS_TWO_BYTE(ch) ? 1 : 0;
+        if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
+            spacing = n > 1 ? 1 : 0;
         else {
             for (int i=0; i<n; i++) {
                 out_text[i] = script_h.getStringBuffer()[string_buffer_offset + i];
@@ -1408,9 +1410,9 @@ char ONScripterLabel::doLineBreak(bool /*isHardBreak*/)
         //add break char to the page log
         current_page->add( 0x0a );
         for (int i=0 ; i<indent_offset ; i++){
-            current_page->add(0x81);
-            current_page->add(0x40);
-            if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+            current_page->add(script_h.enc.getEncoding() == Encoding::CODE_GBK ? 0xa1 : 0x81);
+            current_page->add(script_h.enc.getEncoding() == Encoding::CODE_GBK ? 0xa1 : 0x40);
+            if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
                 sentence_font.advanceCharInHankaku(2);
             else
                 sentence_font.advanceCharInHankaku(sentence_font.pitch_xy[0]);
@@ -1841,7 +1843,7 @@ int ONScripterLabel::findNextBreak(int offset, int &len)
             if (debug_msg) printf("Got to point: >>%s\nMaking changes to variables...", string_buffer+i);
             n = script_h.enc.getBytes(string_buffer[i]);
             i += n;
-            if (script_h.enc.getEncoding() == Encoding::CODE_CP932)
+            if (script_h.enc.getEncoding() != Encoding::CODE_UTF8)
                 len += n;
             else {
                 char check_text[5] = {'\0', '\0', '\0', '\0', '\0'};

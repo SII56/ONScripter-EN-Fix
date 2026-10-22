@@ -10,6 +10,9 @@ LIBSUFFIX ?= .a
 CXX ?= g++
 CXXSTD = -std=c++98
 CXXFLAGS = -g -Wall -Wextra -DGTEST_LANG_CXX11=0 $(DEFS) -pthread
+ifeq ($(shell uname -s),Darwin)
+ICONV_LIBS = -liconv
+endif
 
 ifeq ($(COVERAGE),1)
 CXXFLAGS += -fprofile-arcs -ftest-coverage -O0
@@ -49,7 +52,7 @@ test_%$(EXESUFFIX): test_%.cpp $(TOPSRC)/%.cpp libgtest$(LIBSUFFIX)
 	./$@
 
 test_Encoding$(EXESUFFIX): test_Encoding.cpp $(TOPSRC)/Encoding.cpp $(TOPSRC)/sjis2utf16.cpp libgtest$(LIBSUFFIX)
-	$(Q)$(CXX) $(CXXSTD) -isystem $(GTEST_INCDIR) -I$(TOPSRC) $(CXXFLAGS) $^ -o $@
+	$(Q)$(CXX) $(CXXSTD) -isystem $(GTEST_INCDIR) -I$(TOPSRC) $(CXXFLAGS) $^ $(ICONV_LIBS) -o $@
 	./$@
 
 test_BaseReader$(EXESUFFIX): test_BaseReader.cpp libgtest$(LIBSUFFIX)
