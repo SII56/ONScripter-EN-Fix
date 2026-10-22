@@ -36,6 +36,17 @@ SDLTSRC = $(ES)/SDL_ttf-2.0.11
 
 LPREFIX = $(shell pwd)/extlib
 
+# macOS: SDL_image 的 ImageIO 后端源码不在仓库里，必须关掉；
+# 另外 extlib 里的 libpng/libjpeg 不在默认搜索路径上，要显式指定。
+# SDL_ttf 自带的 showfont 示例链接时缺 iconv 符号。
+ifeq ($(SYS),MacOSX)
+SDL_IMAGE_EXTRA = CPPFLAGS="-I$(LPREFIX)/include" LDFLAGS="-L$(LPREFIX)/lib" LIBS="-liconv"
+SDL_TTF_EXTRA   = LIBS="-liconv"
+else
+SDL_IMAGE_EXTRA =
+SDL_TTF_EXTRA   =
+endif
+
 CLEAN_TARGETS=clean_sdl clean_sdl_image clean_sdl_mixer clean_bzip2   \
               clean_smpeg clean_freetype clean_sdl_ttf
 DISTCLEAN_TARGETS=dclean_sdl dclean_sdl_image dclean_sdl_mixer        \
@@ -96,11 +107,11 @@ $(SDLISRC)/Makefile: $(if $(INTERNAL_SDL),$(EB)/sdl-config) \
 	@echo Configuring internal SDL_image...
 	@cd $(SDLISRC) && \
 	./configure --prefix="$(LPREFIX)" $(OTHERCONFIG) \
-	    $(addprefix --disable-,shared lbm pcx pnm tga xcf xv tif \
+	    $(addprefix --disable-,shared lbm pcx pnm tga xcf xv tif imageio \
 	    	                   $(if $(INTERNAL_LIBPNG),png-shared) \
                                    $(if $(INTERNAL_LIBJPEG),jpg-shared)) \
             CFLAGS="$(CFLAGS) -Wno-error=incompatible-pointer-types" \
-	    $(REDIR)
+	    $(SDL_IMAGE_EXTRA) $(REDIR)
 	@if grep -q 'PNG image loading disabled' $(SDLISRC)/config.log; then \
 	    echo "PNG error - check $(SDLISRC)/config.log for details"; \
 	    rm Makefile; \
@@ -137,7 +148,7 @@ $(EL)/libz$(LIBSUFFIX): | $(EL)
 
 $(JPEGSRC)/Makefile:
 	@echo Configuring internal libjpeg...
-	@perl -pi -e 's/^bin_PROGRAMS/EXTRA_PROGRAMS/' -e 's/^man_MANS\s*=.*/man_MANS =/' $(JPEGSRC)/Makefile.am
+	@perl -pi -e 's/^bin_PROGRAMS/EXTRA_PROGRAMS/; s/^man_MANS\s*=.*/man_MANS =/' $(JPEGSRC)/Makefile.am
 	@cd $(JPEGSRC) && \
 	autoreconf -fi && \
 	./configure --prefix="$(LPREFIX)" --disable-shared --enable-static $(OTHERCONFIG) $(REDIR)
@@ -275,7 +286,7 @@ dclean_sdl_ttf: clean_sdl_ttf
 $(SDLTSRC)/Makefile: $(if $(INTERNAL_SDL),$(EB)/sdl-config) $(if $(INTERNAL_FREETYPE),$(EB)/freetype-config)
 	@echo Configuring internal SDL_ttf...
 	@cd $(SDLTSRC) && \
-	./configure --prefix="$(LPREFIX)" --disable-shared $(OTHERCONFIG) $(REDIR)
+	./configure --prefix="$(LPREFIX)" --disable-shared $(OTHERCONFIG) $(SDL_TTF_EXTRA) $(REDIR)
 
 $(EL)/libSDL_ttf$(LIBSUFFIX): $(SDLTSRC)/Makefile | $(EL)
 	@echo Building internal SDL_ttf...

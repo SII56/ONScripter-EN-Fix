@@ -31,35 +31,8 @@ for d in libogg-1.3.5 libvorbis-1.3.7; do
     ( cd "$EXT/src/$d" && autoreconf -fi >/dev/null )
 done
 
-# SDL_ttf: 自带的 showfont 示例链接时缺 iconv 符号，configure 时补上 -liconv。
-if [ ! -f "$EXT/lib/libSDL_ttf.a" ]; then
-    echo "==> 构建 SDL_ttf"
-    ( cd "$EXT/src/SDL_ttf-2.0.11" && rm -f Makefile &&
-      ./configure --prefix="$EXT" --disable-shared LIBS="-liconv" >/dev/null &&
-      make >/dev/null && make install >/dev/null )
-fi
-
-# SDL_image: 三个坑
-#   1) 源码树里缺 IMG_ImageIO.m，必须 --disable-imageio
-#   2) 默认探测不到 extlib 里的 libpng/libjpeg，加载器会被编译成空壳
-#   3) IMG_png.c 与 libpng 1.6 的函数指针签名不兼容，要放宽检查
-# 另外它的 Makefile 让示例先于静态库链接，所以只构建库本身。
-if [ ! -f "$EXT/lib/libSDL_image.a" ]; then
-    echo "==> 构建 SDL_image"
-    ( cd "$EXT/src/SDL_image-1.2.12" && rm -f Makefile &&
-      ./configure --prefix="$EXT" --disable-shared \
-          --disable-imageio --disable-tif --disable-webp \
-          --enable-png --disable-png-shared --enable-jpg --disable-jpg-shared \
-          CPPFLAGS="-I$EXT/include" LDFLAGS="-L$EXT/lib" LIBS="-liconv" \
-          CFLAGS="-O2 -Wno-incompatible-function-pointer-types -Wno-error" >/dev/null &&
-      make libSDL_image.la >/dev/null &&
-      cp .libs/libSDL_image.a "$EXT/lib/" &&
-      cp SDL_image.h "$EXT/include/" &&
-      cp SDL_image.h "$EXT/include/SDL/" 2>/dev/null || true )
-fi
-
-# 让 extlib 的规则认为这些库已经是最新的（否则会重新走一遍示例程序的构建）
-touch "$EXT/lib/libSDL_ttf.a" "$EXT/lib/libSDL_image.a"
+# SDL_ttf / SDL_image 的特殊 configure 参数放在 Makefile.extlibs 里
+# （见那边的 ifeq ($(SYS),MacOSX)），这里不再手工预构建，交给 make 的依赖顺序走。
 
 if [ ! -f Makefile ]; then
     echo "==> configure"
