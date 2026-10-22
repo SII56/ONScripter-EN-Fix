@@ -92,7 +92,7 @@ for path in files:
 info = dict(CFBundleExecutable='onscripter-en', CFBundleIdentifier='org.onscripter.en.macos',
             CFBundleName='ONScripter-EN', CFBundleDisplayName='ONScripter-EN',
             CFBundlePackageType='APPL', CFBundleIconFile='ons-en.icns',
-            CFBundleVersion='1', CFBundleShortVersionString='1.0',
+            CFBundleVersion='1', CFBundleShortVersionString='0.1.0',
             NSHighResolutionCapable=True, LSMinimumSystemVersion='.'.join(map(str, minimum)))
 with (contents / 'Info.plist').open('wb') as out:
     plistlib.dump(info, out)
