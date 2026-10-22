@@ -82,6 +82,26 @@ brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg dylibbundler \
 
 ---
 
+## 运行游戏
+
+和上游一样，游戏目录里**必须**有一个字体文件（`default.ttf` / `.ttc` / `.otf` / `.otc`）。
+
+注意：ONScripter-EN **没有** macOS 系统字体回退（insani 分支才有，它会用 Hiragino Maru Gothic）。
+没放字体时会直接 `no font file detected; exiting`。临时测试可以：
+
+```bash
+cp "/System/Library/Fonts/Supplemental/AppleGothic.ttf" 游戏目录/default.ttf
+```
+
+正式玩日文游戏建议用等宽 CJK 字体（Genjyuu Gothic X Monospace / Migu 2M / Sazanami Gothic）。
+
+## 已验证到什么程度
+
+- `--help` / `--version` 正常
+- 最小脚本（`*define` / `game` / 一行文本）能解析、执行、正常退出
+- SDL 视频初始化（sdl12-compat）、字体加载、脚本解析链路都走通了
+- **没有跑过完整游戏**，音频 / 视频 / 存档 / 菜单都还没实测
+
 ## 已知限制
 
 - **没有做 app bundle**。目前产物是裸二进制，存档默认写在游戏目录。  
@@ -89,7 +109,8 @@ brew install sdl12-compat smpeg libogg libvorbis mad bzip2 jpeg dylibbundler \
 - **没有代码签名 / 公证**。自己本机用 `codesign -s - onscripter-en` 即可；  
   对外分发需要 Apple 开发者账号（$99/年）+ notarytool。
 - **MIDI**：走 SDL_mixer 的 native_midi_macosx（AudioToolbox），没有实测过 MIDI 游戏。
-- **未跑过实际游戏**。目前只验证了二进制能启动、`--help` / `--version` 正常。
+- **未跑过实际游戏**。目前只验证了二进制能启动、`--help` / `--version` 正常、最小脚本能跑通；
+  音频 / 视频 / 存档 / 菜单都还没实测。
 - **arm64 没有 SSE/MMX 加速**。`configure` 的 `ARCH` 检测只认 x86/x86_64/ppc，  
   Apple Silicon 落到 `unknown`，于是 `USE_CPU_GFX=false`，纯 C 路径。功能正常，只是慢一点。
 
